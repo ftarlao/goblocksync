@@ -1,33 +1,45 @@
 package controller
 
 import (
-	"os"
 	"fmt"
+	"goblocksync/data/configuration"
 	"goblocksync/utils"
-	"goblocksync/data"
+	"os"
 )
 
-type Source struct {
-	Config data.Configuration
-	currentPosition int64
-	sourceFile     *os.File
+type Source interface {
+	GetConfig() configuration.Configuration
+	Start() error
 }
 
-func (s Source) Start(){
-	// You'll often want more control over how and what
-	// parts of a file are read. For these tasks, start
-	// by `Open`ing a file to obtain an `os.File` value.
-	f, err := os.Open(s.Config.SourceFileName)
-	utils.Check(err)
+type sourceV1 struct {
+	Config        configuration.Configuration
+	startPosition int64
+	sourceFile    *os.File
+}
 
-	_, err = f.Seek(s.currentPosition, 0)
-	utils.Check(err)
+func (s sourceV1) GetConfig() configuration.Configuration {
+	return s.Config
+}
 
-	// Read some bytes from the beginning of the file.
-	// Allow up to 5 to be read but also note how many
-	// actually were read.
-	b1 := make([]byte, 2048)
-	n1, err := f.Read(b1)
-	utils.Check(err)
-	fmt.Printf("%d bytes: %s\n", n1, string(b1))
+func (s sourceV1) Start() error {
+
+	f, err := os.Open(s.Config.SourceFile.FileName)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	hasher := utils.NewHasherImpl(s.Config.BlockSize, f, s.Config.StartLoc)
+	success, err := hasher.Start()
+	if !success {
+		fmt.Println(err)
+	}
+	return err
+}
+
+func NewSource(config configuration.Configuration) sourceV1 {
+	s := sourceV1{Config: config}
+	s.startPosition = config.StartLoc
+	return s
 }

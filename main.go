@@ -3,46 +3,69 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"goblocksync/data"
 	"goblocksync/controller"
+	"goblocksync/data/configuration"
+	"os"
+	"time"
 )
 
-// var version int = 0
-
 func main() {
-	globalConfig, correct, err := parseArgs()
-
-	if !correct {
+	globalConfig, isMaster, err := parseArgs()
+	if err != nil {
 		fmt.Println("Error: ", err)
 		os.Exit(3) //let's look for hardcoded error codes
 	}
+	if isMaster {
+		fmt.Println("Goblocksync command executed")
 
-	fmt.Println("Goblocksync running...\n\nThe destination file will be synched with the source file")
-	fmt.Println("DESTINATION FILE WILL BE OVERWRITTEN\n")
-	fmt.Println("Source file:\t\t", globalConfig.SourceFileName)
-	fmt.Println("Destination file:\t", globalConfig.DestinationFileName)
+		fmt.Println("The destination file will be synched with the source file")
+		fmt.Println("DESTINATION FILE WILL BE OVERWRITTEN\n")
+		fmt.Println("Source file:\t\t", globalConfig.SourceFile)
+		fmt.Println("Destination file:\t", globalConfig.DestinationFile)
 
-	// Access files
-	source := controller.Source{}
-	source.Config = globalConfig
-	source.Start()
+		//Start Master
+		master := controller.NewMaster(*globalConfig)
+		master.Start()
+
+		time.Sleep(3000 * time.Millisecond)
+	} else {
+
+		slave := controller.NewSlave()
+		slave.Start()
+
+		time.Sleep(3000 * time.Millisecond)
+	}
+	/*hashChan := hasher.GetChannel()
+	var i int = 0
+	for hash := range hashChan {
+		i++
+		fmt.Println("Block ",i," hash: ",hash)
+	}*/
 }
 
-func parseArgs() (data.Configuration, bool, error) {
+// returns configuration, isMaster boolean, and in case.. an error. Configuration is nil for slave
+func parseArgs() (*configuration.Configuration, bool, error) {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "goblocksync -s sourcefile -d destinationfile\n\n")
+		fmt.Print(os.Stderr, "goblocksync -s sourcefile -d destinationfile\n\n")
 		flag.PrintDefaults()
 	}
-	sourceFile := flag.String("s", "", "Source file path")
-	destinationFile := flag.String("d", "", "Destination file path")
+
+	sourceFileName := flag.String("s", "", "Source file path")
+	destinationFileName := flag.String("d", "", "Destination file path")
+	isSlave := flag.Bool("S", false, "Enables slave mode, the other arguments are ignored")
 	flag.Parse()
 
+	if *isSlave {
+		return nil, false, nil
+	}
+	// When master we parse
+
+	//TODO to assign the isSource matters for future remote connections
 	// populate the configuration
-	globalConfig := data.Configuration{*sourceFile, *destinationFile}
+	globalConfig := configuration.Configuration{!*isSlave, true, configuration.FileDetails{FileName: *sourceFileName},
+		configuration.FileDetails{FileName: *destinationFileName}, 0, 4096}
 
 	// validate the configuration
-	correct, err := globalConfig.Validate()
-
-	return globalConfig, correct, err
+	_, err := globalConfig.Validate()
+	return &globalConfig, !*isSlave, err
 }
