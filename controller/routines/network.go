@@ -2,9 +2,10 @@ package routines
 
 import (
 	"encoding/gob"
-	"goblocksync/data/configuration"
-	"goblocksync/data/messages"
+
 	"io"
+	"github.com/ftarlao/goblocksync/data/messages"
+	"github.com/ftarlao/goblocksync/data/configuration"
 )
 
 type networkManager struct {

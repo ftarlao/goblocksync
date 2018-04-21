@@ -3,11 +3,11 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"goblocksync/controller/routines"
-	"goblocksync/data/configuration"
-	"goblocksync/data/messages"
 	"io"
 	"os"
+	"github.com/ftarlao/goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/controller/routines"
+	"github.com/ftarlao/goblocksync/data/messages"
 )
 
 //DESTINATION

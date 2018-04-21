@@ -1,6 +1,6 @@
 package messages
 
-import "goblocksync/data/configuration"
+import "github.com/ftarlao/goblocksync/data/configuration"
 
 const HelloInfoMessageID byte = 1
 

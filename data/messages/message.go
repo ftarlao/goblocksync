@@ -3,7 +3,7 @@ package messages
 import (
 	"encoding/gob"
 	"errors"
-	"goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/data/configuration"
 )
 
 type Message interface {

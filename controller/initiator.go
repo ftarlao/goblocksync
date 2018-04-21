@@ -2,14 +2,15 @@ package controller
 
 import (
 	"errors"
-	"goblocksync/controller/routines"
-	"goblocksync/data/configuration"
-	"goblocksync/data/messages"
-	"goblocksync/utils"
+
 	"io"
 	"log"
 	"os"
 	"os/exec"
+	"github.com/ftarlao/goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/controller/routines"
+	"github.com/ftarlao/goblocksync/data/messages"
+	"github.com/ftarlao/goblocksync/utils"
 )
 
 //Interface for Master and Slave both

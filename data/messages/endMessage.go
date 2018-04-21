@@ -1,6 +1,5 @@
 package messages
 
-import "goblocksync/data/configuration"
 
 const EndMessageID byte = 4
 

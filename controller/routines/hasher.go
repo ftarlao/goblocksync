@@ -3,10 +3,10 @@ package routines
 import (
 	"bufio"
 	"fmt"
-	"goblocksync/data/configuration"
-	"goblocksync/data/messages"
 	"io"
 	"os"
+	"github.com/ftarlao/goblocksync/data/messages"
+	"github.com/ftarlao/goblocksync/data/configuration"
 )
 
 type Hasher interface {
