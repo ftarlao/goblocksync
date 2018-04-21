@@ -1,5 +1,9 @@
 package utils
 
+import (
+	"encoding/gob"
+	"io"
+)
 
 // This helper will streamline the error
 func Check(e error) {
@@ -8,6 +12,7 @@ func Check(e error) {
 	}
 }
 
+// When array arr contains integer el, returns true, otherwise returns false
 func contains(arr []int, el int) bool {
 	for _, a := range arr {
 		if a == el {
@@ -17,18 +22,19 @@ func contains(arr []int, el int) bool {
 	return false
 }
 
-// Array of common values
+// Create the Array containing the values in arr1 that are also in arr2, there is no unicity constrain
 func Intersection(arr1 []int, arr2 []int) (intersection []int) {
-	intersection = make([]int,0,len(arr1))
+	intersection = make([]int, 0, len(arr1))
 	for _, a := range arr1 {
-		if contains(arr2,a) {
+		if contains(arr2, a) {
 			intersection = append(intersection, a)
 		}
 	}
 	return intersection
 }
 
-func Max(arr []int) (el *int){
+// Find max in array, returns nil for empty arrays
+func Max(arr []int) (el *int) {
 	if len(arr) == 0 {
 		return nil
 	}
@@ -39,4 +45,8 @@ func Max(arr []int) (el *int){
 		}
 	}
 	return &maxim
+}
+
+func DoNothing(a interface{}) {
+
 }

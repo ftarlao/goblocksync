@@ -1,4 +1,4 @@
-package utils
+package routines
 
 import (
 	"bufio"
@@ -38,6 +38,8 @@ func (h *hasherImpl) GetChannel() chan messages.HashGroupMessage {
 }
 
 func (h *hasherImpl) Start() (bool, error) {
+	h.running = false
+
 	_, err := h.fileDesc.Seek(h.currentLoc, 0)
 	fBuffered := bufio.NewReader(h.fileDesc)
 
@@ -45,15 +47,16 @@ func (h *hasherImpl) Start() (bool, error) {
 		fmt.Println(err)
 		return false, err
 	}
-
+	// Dovrei leggere per hash solo quando non ci sono altri dati da leggere o scrivere? Come schedulare tra le due attività?
+	// Saltare a pendolo tra una e l'altra?
 	go func() {
 		var errCycle error = nil
 		var n1, numHashes int //numHashes is the size of the current HashGroupMessage
 		var hashGroupMessage messages.HashGroupMessage
 		for errCycle == nil {
 			// Create new HashGroupMessage
-			if numHashes >= configuration.HashGroupMessageSize{
-				fmt.Println("msg:" ,hashGroupMessage)
+			if numHashes >= configuration.HashGroupMessageSize {
+				fmt.Println("msg:", hashGroupMessage)
 				h.hashGroupChannel <- hashGroupMessage
 				h.hashGroupChannel = nil //defensive, should not be used again
 				numHashes = 0
@@ -82,10 +85,11 @@ func (h *hasherImpl) Start() (bool, error) {
 		//Let's send the last one if not-empty
 		if numHashes > 0 {
 			hashGroupMessage.TruncHashGroup(numHashes)
-			fmt.Println("msg:" ,hashGroupMessage)
+			fmt.Println("msg:", hashGroupMessage)
 			h.hashGroupChannel <- hashGroupMessage
 		}
-		// fmt.Println("Hashing of file completed")
+		// send EOF
+		h.hashGroupChannel <- messages.NewHashMessageEOF()
 	}()
 	return true, nil
 }

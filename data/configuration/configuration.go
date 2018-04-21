@@ -5,32 +5,20 @@ import (
 	"os"
 )
 
-type FileDetails struct {
-	FileName string
-	//file size [Bytes]
-	size int64
-	// true when this file represents a device (Linux/Unix/iOS)
-	isDevice bool
-}
-
-func (f FileDetails) Update() (bool, error) {
-	fileInfo, err := os.Stat("/path/to/file");
-	if err != nil {
-		return false, err
-	}
-	// get the size
-	f.size = fileInfo.Size()
-	f.isDevice = true //TODO to operate with block devices.. for real
-}
-
 //TODO Should few details about Master file names be masked .. and useless fields emptied? Less infos to the slave peer
+const ConfigurationMessageID byte = 3
+
 type Configuration struct {
-	IsMaster        bool
+	// IsMaster or IsSlave
+	IsMaster bool
+	// IsSource or IsDestination
 	IsSource        bool
 	SourceFile      FileDetails
 	DestinationFile FileDetails
-	StartLoc        int64
-	BlockSize       int64
+	// Starting file location [bytes]
+	StartLoc int64
+	// BlockSize [bytes]
+	BlockSize int64
 }
 
 func (c Configuration) Validate() (bool, error) {
@@ -55,17 +43,26 @@ func (c Configuration) Complement() Configuration {
 	return conf
 }
 
-// Hardcoded constants
-// Number of hashes inside one HashGroupMessage
-const HashGroupMessageSize = 4
+func (Configuration) GetMessageID() byte {
+	return ConfigurationMessageID
+}
 
-//Bytes of supported read ahead, the file size the buffered hashes should cover (64M)
-const HashChannelMaxBytes = 64 * 1024 * 1024
+type FileDetails struct {
+	FileName string
+	//file size [Bytes]
+	size int64
+	// true when file represents a device (Linux/Unix/iOS)
+	isDevice bool
+}
 
-// Hash size [bytes]
-const HashSize = 4
-
-// Size of the HashGroupMessage channel buffer (max number elements)
-const HashGroupChannelSize = HashChannelMaxBytes / (HashGroupMessageSize * HashSize)
-
-var SupportedProtocols = []int {1}
+func (f FileDetails) Update() (bool, error) {
+	fileInfo, err := os.Stat("/path/to/file")
+	if err != nil {
+		return false, err
+	}
+	// get the size
+	f.size = fileInfo.Size()
+	f.isDevice = false
+	//TODO to operate with block devices.. for real
+	return true, err
+}

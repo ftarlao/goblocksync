@@ -1,15 +1,15 @@
 package controller
 
 import (
+	"errors"
+	"goblocksync/controller/routines"
 	"goblocksync/data/configuration"
-	"os/exec"
-	"path/filepath"
-	"os"
-	"log"
-	"encoding/gob"
-	"io"
 	"goblocksync/data/messages"
 	"goblocksync/utils"
+	"io"
+	"log"
+	"os"
+	"os/exec"
 )
 
 //Interface for Master and Slave both
@@ -22,10 +22,10 @@ type Initiator interface {
 //Master
 
 type master struct {
-	Config        configuration.Configuration
+	Config configuration.Configuration
 }
 
-func NewMaster(conf configuration.Configuration) master{
+func NewMaster(conf configuration.Configuration) master {
 	return master{conf}
 }
 
@@ -35,47 +35,46 @@ func (m master) GetConfig() configuration.Configuration {
 
 func (m master) Start() (err error) {
 
-	// execute slave locally
-	// connect slave with encoder/decoder
-	inDecoder, outEncoder, err := execSlave()
+	//TODO to understand golang logging and change/remove prints with 'professional' stuff
+	// execute slave locally and connect slave with encoder/decoder
+	in, out, err := execSlave()
 	//defer cmd.Process.Kill()
-
 	if err != nil {
-		panic(err)
-	}
-	//send hello+version/receive hello+version
-	err = outEncoder.Encode(messages.NewHelloInfo())
-	if err != nil {
-		panic(err)
+		return err
 	}
 
-	var remoteHelloInfo messages.HelloInfo
-	err  =inDecoder.Decode(&remoteHelloInfo)
+	// perform Handshake
+	bestProtocol, err := handshake(in, out)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	log.Println("Best selected protocol: ", *bestProtocol)
 
-	//choose protocol version
-	inter := utils.Intersection(configuration.SupportedProtocols,remoteHelloInfo.SupportedProtocols)
-	bestProtocol := utils.Max(inter)
-
-	log.Println("Best selected protocol: ",bestProtocol)
+	//Prepare encoder/decoder based on configuration
+	_, outEncoder := routines.EncoderInOut(in, out)
 	//send complemented configuration to slave
-	//execute source or destination controller (for selected protocol version)
-	//source := NewSource(m.Config)
-	//err = source.Start()
+	remoteConf := m.Config.Complement()
+	err = outEncoder.Encode(remoteConf)
+	if err != nil {
+		return err
+	}
 
+	//execute source or destination controller (for selected protocol version)
+	source, err := NewSource(m.Config, *bestProtocol, in, out)
+	if err != nil {
+		return err
+	}
+	err = source.Start()
 	return err
 }
-
 
 //Slave
 
 type slave struct {
-	Config        configuration.Configuration
+	Config configuration.Configuration
 }
 
-func NewSlave() slave{
+func NewSlave() slave {
 	return slave{}
 }
 
@@ -85,35 +84,72 @@ func (m slave) GetConfig() configuration.Configuration {
 
 func (m slave) Start() error {
 
-	//send hello+version/receive hello+version
-	//choose protocol version
+	//send hello+version/receive hello+version, choose protocol version
+	protocol, err := handshake(os.Stdin, os.Stdout)
+	if err != nil {
+		return err
+	}
+
 	//receive complemented configuration from master
 	//execute source or destination controller (for selected protocol version)
 
-	//source := NewSource(m.Config)
-	//err := source.Start()
+	if m.Config.IsSource {
+		source, err := NewSource(m.Config, *protocol, os.Stdin, os.Stdout)
+		if err != nil {
+			return err
+		}
+		err = source.Start()
+	} else {
+		destination, err := NewDestination(m.Config, *protocol, os.Stdin, os.Stdout)
+		if err != nil {
+			return err
+		}
+		err = destination.Start()
+
+	}
 
 	return nil
 }
 
 // Executes slave locally, inDecoder sends objects to the process, outEncoder reads objects from the process
-func execSlave() (inDecoder *gob.Decoder, outEncoder *gob.Encoder, err error){
+func execSlave() (in io.Reader, out io.Writer, err error) {
 	execName := os.Args[0]
 
 	cmd := exec.Command(execName, "-S")
 
-	out, _ := cmd.StdinPipe()
-	in, _ := cmd.StdoutPipe()
-	outEncoder = gob.NewEncoder(out)
-	inDecoder = gob.NewDecoder(in)
+	out, _ = cmd.StdinPipe()
+	in, _ = cmd.StdoutPipe()
 
-	err = cmd.Run()
+	err = cmd.Start()
 	if err != nil {
-		return nil,nil, err
+		return nil, nil, err
 	}
 	return
 }
 
-func chooseProtocol(remoteSupported []int){
+func handshake(in io.Reader, out io.Writer) (bestProtocol *int, err error) {
+	inDecoder, outEncoder := routines.EncoderInOut(in, out)
 
+	// send hello+version
+	err = messages.EncodeMessage(outEncoder, messages.NewHelloInfo())
+	//err = outEncoder.Encode(messages.NewHelloInfo())
+	if err != nil {
+		return bestProtocol, err
+	}
+	// receive hello+version
+	var remoteHelloInfo messages.HelloInfoMessage
+	m, err := messages.DecodeMessage(inDecoder)
+	//err = inDecoder.Decode(&remoteHelloInfo)
+	remoteHelloInfo = m.(messages.HelloInfoMessage)
+	if err != nil {
+		return bestProtocol, err
+	}
+
+	// let's choose protocol version
+	inter := utils.Intersection(configuration.SupportedProtocols, remoteHelloInfo.SupportedProtocols)
+	if len(inter) == 0 {
+		return bestProtocol, errors.New("master and slave protocols versions are no compatible")
+	}
+	bestProtocol = utils.Max(inter)
+	return bestProtocol, err
 }

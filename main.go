@@ -20,8 +20,8 @@ func main() {
 
 		fmt.Println("The destination file will be synched with the source file")
 		fmt.Println("DESTINATION FILE WILL BE OVERWRITTEN\n")
-		fmt.Println("Source file:\t\t", globalConfig.SourceFile)
-		fmt.Println("Destination file:\t", globalConfig.DestinationFile)
+		fmt.Println("Source file:\t\t", globalConfig.SourceFile.FileName)
+		fmt.Println("Destination file:\t", globalConfig.DestinationFile.FileName)
 
 		//Start Master
 		master := controller.NewMaster(*globalConfig)
@@ -35,12 +35,7 @@ func main() {
 
 		time.Sleep(3000 * time.Millisecond)
 	}
-	/*hashChan := hasher.GetChannel()
-	var i int = 0
-	for hash := range hashChan {
-		i++
-		fmt.Println("Block ",i," hash: ",hash)
-	}*/
+
 }
 
 // returns configuration, isMaster boolean, and in case.. an error. Configuration is nil for slave
