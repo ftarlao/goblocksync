@@ -1,5 +1,5 @@
 # goblocksync
-Syncronizes two files remotely, or locally, well-suited for block devices. Aims at minimizing completion time for very large files--i.e.rsync for large block-devices/files
+Syncronizes two files remotely, or locally. Aims at minimizing completion time for very large files--i.e.rsync for large block-devices/files
 
 At the moment the project is in a not-working, not usable.. state. Work-in-progress.
 
