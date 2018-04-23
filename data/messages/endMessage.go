@@ -1,6 +1,5 @@
 package messages
 
-
 const EndMessageID byte = 4
 
 type EndMessage struct {

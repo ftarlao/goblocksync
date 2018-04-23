@@ -3,15 +3,15 @@ package routines
 import (
 	"bufio"
 	"fmt"
+	"github.com/ftarlao/goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/data/messages"
 	"io"
 	"os"
-	"github.com/ftarlao/goblocksync/data/messages"
-	"github.com/ftarlao/goblocksync/data/configuration"
 )
 
 type Hasher interface {
-	GetChannel() chan messages.HashGroupMessage
-	Start() (bool, error)
+	GetOutMsgChannel() chan messages.Message
+	Start() error
 	Stop()
 	GetCurrentLoc() int64
 	//SetCurrentLoc(int64)
@@ -26,18 +26,18 @@ type hasherImpl struct {
 	// Current position of hashing operator in bytes; the next hash is for the [currentLoc,currentLoc+blockSize) portion
 	currentLoc int64
 	// Output chan for the obtained hashes
-	hashGroupChannel chan messages.HashGroupMessage
+	outMsgChannel chan messages.Message
 	// Current running status
 	running bool
 	// Communicate stop to goroutine
-	quitChannel chan bool
+	statusChannel chan messages.Message
 }
 
-func (h *hasherImpl) GetChannel() chan messages.HashGroupMessage {
-	return h.hashGroupChannel
+func (h *hasherImpl) GetOutMsgChannel() chan messages.Message {
+	return h.outMsgChannel
 }
 
-func (h *hasherImpl) Start() (bool, error) {
+func (h *hasherImpl) Start() error {
 	h.running = false
 
 	_, err := h.fileDesc.Seek(h.currentLoc, 0)
@@ -45,7 +45,7 @@ func (h *hasherImpl) Start() (bool, error) {
 
 	if err != nil {
 		fmt.Println(err)
-		return false, err
+		return err
 	}
 	// Dovrei leggere per hash solo quando non ci sono altri dati da leggere o scrivere? Come schedulare tra le due attività?
 	// Saltare a pendolo tra una e l'altra?
@@ -53,12 +53,12 @@ func (h *hasherImpl) Start() (bool, error) {
 		var errCycle error = nil
 		var n1, numHashes int //numHashes is the size of the current HashGroupMessage
 		var hashGroupMessage messages.HashGroupMessage
-		for errCycle == nil {
+		for errCycle == nil && h.running {
 			// Create new HashGroupMessage
 			if numHashes >= configuration.HashGroupMessageSize {
 				fmt.Println("msg:", hashGroupMessage)
-				h.hashGroupChannel <- hashGroupMessage
-				h.hashGroupChannel = nil //defensive, should not be used again
+				h.outMsgChannel <- hashGroupMessage
+				h.outMsgChannel = nil //defensive, should not be used again
 				numHashes = 0
 			}
 
@@ -77,8 +77,7 @@ func (h *hasherImpl) Start() (bool, error) {
 					numHashes++
 					h.currentLoc += int64(n1)
 				}
-			case <-h.quitChannel:
-				return
+
 			}
 		}
 
@@ -86,16 +85,16 @@ func (h *hasherImpl) Start() (bool, error) {
 		if numHashes > 0 {
 			hashGroupMessage.TruncHashGroup(numHashes)
 			fmt.Println("msg:", hashGroupMessage)
-			h.hashGroupChannel <- hashGroupMessage
+			h.outMsgChannel <- hashGroupMessage
 		}
 		// send EOF
-		h.hashGroupChannel <- messages.NewHashMessageEOF()
+		h.outMsgChannel <- messages.NewHashMessageEOF()
 	}()
-	return true, nil
+	return nil
 }
 
 func (h *hasherImpl) Stop() {
-	h.quitChannel <- true
+	h.running = false
 	return
 }
 
@@ -109,12 +108,12 @@ func (h *hasherImpl) isRunning() bool {
 
 func NewHasherImpl(blockSize int64, fileDesc *os.File, startLoc int64) Hasher {
 	instance := &hasherImpl{blockSize: blockSize, fileDesc: fileDesc, currentLoc: startLoc}
-	instance.hashGroupChannel = make(chan messages.HashGroupMessage, configuration.HashGroupChannelSize)
+	instance.outMsgChannel = make(chan messages.Message, configuration.HashGroupChannelSize)
 	instance.running = false
 	return instance
 }
 
-// very dumb 'size' bit hash
+// very dumb 'size' bit hash, for tests only
 func dummyHash(data []byte, size int) (hash []byte) {
 	hash = make([]byte, size)
 	for i, elem := range data {

@@ -3,11 +3,11 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"github.com/ftarlao/goblocksync/controller/routines"
+	"github.com/ftarlao/goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/data/messages"
 	"io"
 	"os"
-	"github.com/ftarlao/goblocksync/data/configuration"
-	"github.com/ftarlao/goblocksync/controller/routines"
-	"github.com/ftarlao/goblocksync/data/messages"
 )
 
 //DESTINATION
@@ -48,7 +48,7 @@ func (d destinationV1) Start() error {
 
 	//Network flow Handler, single point (and thread) to send and receive messages
 	//Should be split in two goroutines or we should add bigger buffers for Pipe Writer/Reader
-	hashChan := hasher.GetChannel()
+	hashChan := hasher.GetOutMsgChannel()
 	count := 0
 	//Separate in different goroutines.. gosh
 _:
@@ -124,7 +124,7 @@ func (s sourceV1) Start() error {
 
 	//Network flow Handler, single point (and thread) to send and receive messages
 	//Should be split in two goroutines or we should add bigger buffers for Pipe Writer/Reader
-	//hashChan := hasher.GetChannel()
+	//hashChan := hasher.GetOutMsgChannel()
 
 	count := 0
 _:

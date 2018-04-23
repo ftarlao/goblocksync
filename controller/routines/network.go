@@ -2,10 +2,11 @@ package routines
 
 import (
 	"encoding/gob"
-
-	"io"
-	"github.com/ftarlao/goblocksync/data/messages"
 	"github.com/ftarlao/goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/data/messages"
+	"io"
+	"sync"
+	"github.com/ftarlao/goblocksync/utils"
 )
 
 type networkManager struct {
@@ -15,18 +16,20 @@ type networkManager struct {
 	outEncoder    *gob.Encoder
 	inMsgChannel  chan messages.Message
 	outMsgChannel chan messages.Message
-	statusChannel chan messages.Message
+	lockIn          sync.Mutex
+	lockOut          sync.Mutex
 	// Current running status
-	running bool
+	runningIn  bool
+	runningOut bool
 }
 
 func NewNetworkManager(in io.Reader, out io.Writer) (n networkManager) {
 	inDecoder, outEncoder := EncoderInOut(in, out)
-	n = networkManager{in, out,
-		inDecoder, outEncoder,
-		make(chan messages.Message, configuration.NetworkChannelsSize),
-		make(chan messages.Message, configuration.NetworkChannelsSize),
-		make(chan messages.Message, 4), false}
+	n = networkManager{InChannel: in, OutChannel: out,
+		inDecoder: inDecoder, outEncoder: outEncoder,
+		inMsgChannel: make(chan messages.Message, configuration.NetworkChannelsSize),
+		outMsgChannel: make(chan messages.Message, configuration.NetworkChannelsSize),
+		runningIn:false, runningOut:false}
 	return
 }
 
@@ -39,60 +42,81 @@ func (n *networkManager) GetOutMsgChannel() chan messages.Message {
 }
 
 func (n *networkManager) Start() (err error) {
-	n.running = true
+	//Synchronized method
+	n.lockIn.Lock()
+	n.lockOut.Lock()
 
+	n.runningOut = true
+	n.runningIn = true
 	//Write messages routine
 	go func() {
-		var err error
-		for n.running {
+		defer n.lockOut.Unlock()
+		defer func() {
+			if r := recover(); r != nil {
+				n.stopOn(r.(error))
+				return
+			}
+		}()
+
+		var errGo error
+		for n.runningOut {
 			select {
 			case msg := <-n.outMsgChannel:
-				err = n.outEncoder.Encode(msg)
-				if err != nil {
-					n.running = false
-					n.statusChannel <- messages.NewErrorMessage(err)
-					return
-				}
+				errGo = messages.EncodeMessage(n.outEncoder,msg)
+				utils.Check(errGo)
 			}
 		}
-		n.statusChannel <- messages.NewEndMessage()
+		errGo = messages.EncodeMessage(n.outEncoder,messages.NewEndMessage())
+		utils.Check(errGo)
 	}()
 
 	//Read messages routine
 	go func() {
-		for n.running {
-			m, err := messages.DecodeMessage(n.inDecoder)
-			if err != nil {
-				n.running = false
-				n.statusChannel <- messages.NewErrorMessage(err)
+		defer n.lockIn.Unlock()
+		defer func() {
+			if r := recover(); r != nil {
+				n.stopOn(r.(error))
 				return
 			}
+		}()
+
+		for n.runningIn {
+			m, errGo := messages.DecodeMessage(n.inDecoder)
+			utils.Check(errGo)
 			n.inMsgChannel <- m
 		}
-		n.statusChannel <- messages.NewEndMessage()
+
+		n.inMsgChannel <- messages.NewEndMessage()
 	}()
 
 	//No flush nor sync exists for Reader/Writer
-
 	return
 }
 
+func (n *networkManager) stopOn(err error){
+	n.runningOut = false
+	n.runningIn = false
+	emsg := messages.NewErrorMessage(err)
+	n.inMsgChannel <- emsg
+}
+
 func (n *networkManager) Stop() (err error) {
-	n.running = false
-	//We wait for exactly two non-error messages
-	for i := 1; i < 2; i++ {
-		select {
-		case msg := <-n.statusChannel:
-			if msg.GetMessageID() == messages.ErrorMessageID {
-				err = msg.(messages.ErrorMessage).Err
-			}
-		}
-	}
+	n.runningIn = false
+	n.runningOut = false
+
+	//Wait stop
+	defer func() {
+		n.lockIn.Unlock()
+		n.lockOut.Unlock()
+	}()
+	n.lockIn.Lock()
+	n.lockOut.Lock()
+
 	return nil
 }
 
-//Utils
 
+//Utils
 func EncoderInOut(in io.Reader, out io.Writer) (inDecoder *gob.Decoder, outEncoder *gob.Encoder) {
 	outEncoder = gob.NewEncoder(out)
 	inDecoder = gob.NewDecoder(in)
