@@ -4,9 +4,9 @@ import (
 	"encoding/gob"
 	"github.com/ftarlao/goblocksync/data/configuration"
 	"github.com/ftarlao/goblocksync/data/messages"
+	"github.com/ftarlao/goblocksync/utils"
 	"io"
 	"sync"
-	"github.com/ftarlao/goblocksync/utils"
 )
 
 type networkManager struct {
@@ -16,8 +16,8 @@ type networkManager struct {
 	outEncoder    *gob.Encoder
 	inMsgChannel  chan messages.Message
 	outMsgChannel chan messages.Message
-	lockIn          sync.Mutex
-	lockOut          sync.Mutex
+	lockIn        sync.Mutex
+	lockOut       sync.Mutex
 	// Current running status
 	runningIn  bool
 	runningOut bool
@@ -27,9 +27,9 @@ func NewNetworkManager(in io.Reader, out io.Writer) (n networkManager) {
 	inDecoder, outEncoder := EncoderInOut(in, out)
 	n = networkManager{InChannel: in, OutChannel: out,
 		inDecoder: inDecoder, outEncoder: outEncoder,
-		inMsgChannel: make(chan messages.Message, configuration.NetworkChannelsSize),
+		inMsgChannel:  make(chan messages.Message, configuration.NetworkChannelsSize),
 		outMsgChannel: make(chan messages.Message, configuration.NetworkChannelsSize),
-		runningIn:false, runningOut:false}
+		runningIn:     false, runningOut: false}
 	return
 }
 
@@ -50,8 +50,8 @@ func (n *networkManager) Start() (err error) {
 	n.runningIn = true
 	//Write messages routine
 	go func() {
-		defer n.lockOut.Unlock()
 		defer func() {
+			n.lockOut.Unlock()
 			if r := recover(); r != nil {
 				n.stopOn(r.(error))
 				return
@@ -62,18 +62,18 @@ func (n *networkManager) Start() (err error) {
 		for n.runningOut {
 			select {
 			case msg := <-n.outMsgChannel:
-				errGo = messages.EncodeMessage(n.outEncoder,msg)
+				errGo = messages.EncodeMessage(n.outEncoder, msg)
 				utils.Check(errGo)
 			}
 		}
-		errGo = messages.EncodeMessage(n.outEncoder,messages.NewEndMessage())
+		errGo = messages.EncodeMessage(n.outEncoder, messages.NewEndMessage())
 		utils.Check(errGo)
 	}()
 
 	//Read messages routine
 	go func() {
-		defer n.lockIn.Unlock()
 		defer func() {
+			n.lockIn.Unlock()
 			if r := recover(); r != nil {
 				n.stopOn(r.(error))
 				return
@@ -93,7 +93,7 @@ func (n *networkManager) Start() (err error) {
 	return
 }
 
-func (n *networkManager) stopOn(err error){
+func (n *networkManager) stopOn(err error) {
 	n.runningOut = false
 	n.runningIn = false
 	emsg := messages.NewErrorMessage(err)
@@ -115,8 +115,11 @@ func (n *networkManager) Stop() (err error) {
 	return nil
 }
 
+func (n *networkManager) isRunning() bool {
+	return n.runningIn || n.runningOut
+}
 
-//Utils
+// Provides input and output gob encoder-decoder from a given Reader-Writer pair
 func EncoderInOut(in io.Reader, out io.Writer) (inDecoder *gob.Decoder, outEncoder *gob.Encoder) {
 	outEncoder = gob.NewEncoder(out)
 	inDecoder = gob.NewDecoder(in)

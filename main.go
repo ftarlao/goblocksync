@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"time"
 	"github.com/ftarlao/goblocksync/controller"
 	"github.com/ftarlao/goblocksync/data/configuration"
+	"os"
+	"time"
 )
 
 func main() {

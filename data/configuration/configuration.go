@@ -43,7 +43,7 @@ func (c Configuration) Complement() Configuration {
 	return conf
 }
 
-func (Configuration) GetMessageID() byte {
+func (*Configuration) GetMessageID() byte {
 	return ConfigurationMessageID
 }
 

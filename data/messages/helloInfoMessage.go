@@ -9,10 +9,10 @@ type HelloInfoMessage struct {
 	SupportedProtocols []int
 }
 
-func NewHelloInfo() HelloInfoMessage {
-	return HelloInfoMessage{"goblocksync", configuration.SupportedProtocols}
+func NewHelloInfo() *HelloInfoMessage {
+	return &HelloInfoMessage{"goblocksync", configuration.SupportedProtocols}
 }
 
-func (HelloInfoMessage) GetMessageID() byte {
+func (*HelloInfoMessage) GetMessageID() byte {
 	return HelloInfoMessageID
 }
