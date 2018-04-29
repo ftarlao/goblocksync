@@ -138,10 +138,10 @@ func handshake(in io.Reader, out io.Writer) (bestProtocol *int, err error) {
 		return bestProtocol, err
 	}
 	// receive hello+version
-	var remoteHelloInfo messages.HelloInfoMessage
+	var remoteHelloInfo *messages.HelloInfoMessage
 	m, err := messages.DecodeMessage(inDecoder)
 	//err = inDecoder.Decode(&remoteHelloInfo)
-	remoteHelloInfo = m.(messages.HelloInfoMessage)
+	remoteHelloInfo = m.(*messages.HelloInfoMessage)
 	if err != nil {
 		return bestProtocol, err
 	}

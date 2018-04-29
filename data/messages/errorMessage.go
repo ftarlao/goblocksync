@@ -1,7 +1,5 @@
 package messages
 
-import "goblocksync/data/configuration"
-
 const ErrorMessageID byte = 2
 
 type ErrorMessage struct {

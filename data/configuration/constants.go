@@ -5,16 +5,16 @@ const Version = 0
 const MinorVersion = 1
 
 // Number of hashes inside one HashGroupMessage
-const HashGroupMessageSize = 4
+const HashGroupMessageSize = 50
 
-//Bytes of supported read ahead, the file size the buffered hashes should cover (64M)
-const HashReadAheadMaxBytes = 64 * 1024 * 1024
+//Bytes for buffered hashes (64M)
+const HashMaxBytes = 64 * 1024 * 1024
 
 // Hash size [bytes], this is currently used by the dumb hash function
 const HashSize = 4
 
 // Size of the HashGroupMessage channel buffer (max number elements in the channel)
-const HashGroupChannelSize = HashReadAheadMaxBytes / (HashGroupMessageSize * HashSize)
+const HashGroupChannelSize = HashMaxBytes / (HashGroupMessageSize * HashSize)
 
 var SupportedProtocols = []int{1}
 

@@ -1,9 +1,6 @@
 package utils
 
-import (
-	"encoding/gob"
-	"io"
-)
+import "io"
 
 // This helper will streamline the error
 func Check(e error) {
@@ -47,6 +44,6 @@ func Max(arr []int) (el *int) {
 	return &maxim
 }
 
-func DoNothing(a interface{}) {
-
+func IsEOF(err error) bool{
+	return err == io.ErrUnexpectedEOF || err == io.EOF
 }

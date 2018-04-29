@@ -19,7 +19,7 @@ func main() {
 		fmt.Println("Goblocksync command executed")
 
 		fmt.Println("The destination file will be synched with the source file")
-		fmt.Println("DESTINATION FILE WILL BE OVERWRITTEN\n")
+		fmt.Print("DESTINATION FILE WILL BE OVERWRITTEN\n\n")
 		fmt.Println("Source file:\t\t", globalConfig.SourceFile.FileName)
 		fmt.Println("Destination file:\t", globalConfig.DestinationFile.FileName)
 
@@ -41,7 +41,7 @@ func main() {
 // returns configuration, isMaster boolean, and in case.. an error. Configuration is nil for slave
 func parseArgs() (*configuration.Configuration, bool, error) {
 	flag.Usage = func() {
-		fmt.Print(os.Stderr, "goblocksync -s sourcefile -d destinationfile\n\n")
+		fmt.Print("goblocksync -s sourcefile -d destinationfile\n\n")
 		flag.PrintDefaults()
 	}
 

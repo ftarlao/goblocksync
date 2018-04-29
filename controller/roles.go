@@ -41,8 +41,8 @@ func (d destinationV1) Start() error {
 
 	// Start hasher
 	hasher := routines.NewHasherImpl(d.Config.BlockSize, f, d.Config.StartLoc)
-	success, err := hasher.Start()
-	if !success {
+	err = hasher.Start()
+	if err!=nil {
 		fmt.Println(err)
 	}
 
@@ -117,8 +117,8 @@ func (s sourceV1) Start() error {
 
 	// Start hasher
 	hasher := routines.NewHasherImpl(s.Config.BlockSize, f, s.Config.StartLoc)
-	success, err := hasher.Start()
-	if !success {
+	err = hasher.Start()
+	if err!=nil {
 		fmt.Println(err)
 	}
 
@@ -134,7 +134,7 @@ _:
 		if err != nil {
 			return err
 		}
-		hashMsg := m.(messages.HashGroupMessage)
+		hashMsg := m.(*messages.HashGroupMessage)
 		hashMsg.StartLoc = 1
 		count++
 		if s.Config.IsMaster {

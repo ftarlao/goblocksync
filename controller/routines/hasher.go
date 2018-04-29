@@ -2,13 +2,14 @@ package routines
 
 import (
 	"bufio"
-	"fmt"
 	"github.com/ftarlao/goblocksync/data/configuration"
 	"github.com/ftarlao/goblocksync/data/messages"
 	"io"
 	"os"
 	"sync"
 	"errors"
+	"fmt"
+	"github.com/ftarlao/goblocksync/utils"
 )
 
 type Hasher interface {
@@ -51,20 +52,20 @@ func (h *hasherImpl) Start() error {
 	h.runningRead = true
 
 
-	go ()
+	go dataReader(h)
 
 	go hasherRoutine(h)
 
 	return nil
 }
 
-func dataReader(hasher *Hasher){
-	defer .lockRead.Unlock()
+func dataReader(hasher *hasherImpl){
+	defer hasher.lockRead.Unlock()
 
 	//seek to the start position
-	_, err := hasher.fileDesc.Seek(h.currentLoc, 0)
+	_, err := hasher.fileDesc.Seek(hasher.currentLoc, 0)
 	if err!=nil {
-		hasher.outMsgChannel <- messages.NewErrorMessage(err)
+		hasher.readDataChannel <- messages.NewErrorMessage(err)
 		return
 	}
 	//..better to put a read buffer
@@ -74,28 +75,27 @@ func dataReader(hasher *Hasher){
 
 	for err == nil && hasher.runningRead {
 		//fmt.Println("Block ", numHashes, "Start position [byte] ", h.currentLoc)
-		dataBlock := make([]byte, h.blockSize)
+		dataBlock := make([]byte, hasher.blockSize)
 		n1, err = io.ReadFull(fBuffered, dataBlock)
 		//An error is sent to the hashing part..
-		if err != nil && err != io.EOF {
-			hasher.outMsgChannel <- messages.NewErrorMessage(err)
+		if err != nil && !utils.IsEOF(err) {
+			hasher.readDataChannel <- messages.NewErrorMessage(err)
 			return //Premature termination
 		}
 		if n1>0 {
 			//allocating a struct and array is inefficient but may be the right thing to parallelize the Hashing part later
 			hasher.readDataChannel <- messages.NewDataBlockMessage(hasher.currentLoc,dataBlock[:n1])
 			hasher.currentLoc += int64(n1)
-			if(err == io.EOF){
-				hasher.outMsgChannel <- messages.NewEndMessage()
+			if utils.IsEOF(err) {
+				hasher.readDataChannel <- messages.NewEndMessage()
 			}
 		}
 	}
-
 }
 
 
-func hasherRoutine(hasher *Hasher) {
-	defer hasher.lockHead.Unlock()
+func hasherRoutine(hasher *hasherImpl) {
+	defer hasher.lockHash.Unlock()
 
 	var err error
 	var msg messages.Message
@@ -106,13 +106,17 @@ func hasherRoutine(hasher *Hasher) {
 
 		switch msg.GetMessageID() {
 		case messages.DataBlockMessageID:
-			dataBlock := msg.(*messages.DataBlockMessage).Data
-			hash := dummyHash(dataBlock, configuration.HashSize)
+			msgDataBlock := msg.(*messages.DataBlockMessage)
+			if currentMessage.IsFull() {
+				hasher.outMsgChannel <- currentMessage
+				currentMessage = messages.NewHashGroupMessage(msgDataBlock.StartLoc)
+			}
+
+			hash := dummyHash(msgDataBlock.Data, configuration.HashSize)
 			currentMessage.AddHash(hash)
 		case messages.EndMessageID:
 			if !currentMessage.IsEmpty() {
 				currentMessage.TruncHashGroup()
-				// fmt.Println("msg:", currentMessage)
 				hasher.outMsgChannel <- currentMessage
 			}
 			hasher.outMsgChannel <- msg
@@ -125,20 +129,21 @@ func hasherRoutine(hasher *Hasher) {
 			return
 		}
 	}
+	fmt.Print("cavolo")
 }
 
 func (h *hasherImpl) Stop() {
 	h.runningRead = false
 	h.runningHash = false
 
-	// waits for the goroutine to stop
+	// waits for the goroutines to stop
 	h.lockRead.Lock()
 	h.lockHash.Lock()
 
-	defer {
+	defer func(){
 		h.lockRead.Unlock()
 		h.lockHash.Unlock()
-	}
+	}()
 	return
 }
 
@@ -147,13 +152,13 @@ func (h *hasherImpl) GetCurrentPosition() int64 {
 }
 
 func (h *hasherImpl) isRunning() bool {
-	return h.running
+	return h.runningHash || h.runningRead
 }
 
 func NewHasherImpl(blockSize int64, fileDesc *os.File, startLoc int64) Hasher {
-	instance := hasherImpl{blockSize: blockSize, fileDesc: fileDesc, currentLoc: startLoc}
+	instance := hasherImpl{blockSize: blockSize, fileDesc: fileDesc, currentLoc: startLoc, runningHash:false,runningRead:false}
 	instance.outMsgChannel = make(chan messages.Message, configuration.HashGroupChannelSize)
-	instance.running = false
+	instance.readDataChannel = make(chan messages.Message, 5)
 	return &instance
 }
 

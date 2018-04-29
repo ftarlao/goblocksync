@@ -23,18 +23,30 @@ func DecodeMessage(decoder *gob.Decoder) (m Message, err error) {
 		return
 	}
 	switch msgID {
-	case HelloInfoMessageID:
-		var msg HelloInfoMessage
-		err = decoder.Decode(&msg)
-		m = msg
 	case HashGroupMessageID:
 		var msg HashGroupMessage
 		err = decoder.Decode(&msg)
-		m = msg
+		m = &msg
+	case DataBlockMessageID:
+		var msg HashGroupMessage
+		err = decoder.Decode(&msg)
+		m = &msg
 	case configuration.ConfigurationMessageID:
 		var msg configuration.Configuration
 		err = decoder.Decode(&msg)
-		m = msg
+		m = &msg
+	case ErrorMessageID:
+		var msg HashGroupMessage
+		err = decoder.Decode(&msg)
+		m = &msg
+	case EndMessageID:
+		var msg HashGroupMessage
+		err = decoder.Decode(&msg)
+		m = &msg
+	case HelloInfoMessageID:
+		var msg HelloInfoMessage
+		err = decoder.Decode(&msg)
+		m = &msg
 	default:
 		err = errors.New("unknown message ID")
 	}
