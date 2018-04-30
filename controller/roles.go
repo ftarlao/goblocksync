@@ -42,7 +42,7 @@ func (d destinationV1) Start() error {
 	// Start hasher
 	hasher := routines.NewHasherImpl(d.Config.BlockSize, f, d.Config.StartLoc)
 	err = hasher.Start()
-	if err!=nil {
+	if err != nil {
 		fmt.Println(err)
 	}
 
@@ -118,7 +118,7 @@ func (s sourceV1) Start() error {
 	// Start hasher
 	hasher := routines.NewHasherImpl(s.Config.BlockSize, f, s.Config.StartLoc)
 	err = hasher.Start()
-	if err!=nil {
+	if err != nil {
 		fmt.Println(err)
 	}
 

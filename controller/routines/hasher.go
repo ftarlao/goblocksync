@@ -2,14 +2,13 @@ package routines
 
 import (
 	"bufio"
+	"errors"
 	"github.com/ftarlao/goblocksync/data/configuration"
 	"github.com/ftarlao/goblocksync/data/messages"
+	"github.com/ftarlao/goblocksync/utils"
 	"io"
 	"os"
 	"sync"
-	"errors"
-	"fmt"
-	"github.com/ftarlao/goblocksync/utils"
 )
 
 type Hasher interface {
@@ -38,6 +37,8 @@ type hasherImpl struct {
 	// lockRead on Start
 	lockRead sync.Mutex
 	lockHash sync.Mutex
+
+	hashingFunc func([]byte, int) []byte
 }
 
 func (h *hasherImpl) GetOutMsgChannel() chan messages.Message {
@@ -51,7 +52,6 @@ func (h *hasherImpl) Start() error {
 	h.runningHash = true
 	h.runningRead = true
 
-
 	go dataReader(h)
 
 	go hasherRoutine(h)
@@ -59,17 +59,17 @@ func (h *hasherImpl) Start() error {
 	return nil
 }
 
-func dataReader(hasher *hasherImpl){
+func dataReader(hasher *hasherImpl) {
 	defer hasher.lockRead.Unlock()
 
 	//seek to the start position
 	_, err := hasher.fileDesc.Seek(hasher.currentLoc, 0)
-	if err!=nil {
+	if err != nil {
 		hasher.readDataChannel <- messages.NewErrorMessage(err)
 		return
 	}
 	//..better to put a read buffer
-	fBuffered := bufio.NewReaderSize(hasher.fileDesc, int(5 * hasher.blockSize))
+	fBuffered := bufio.NewReaderSize(hasher.fileDesc, int(5*hasher.blockSize))
 
 	var n1 = 0
 
@@ -82,9 +82,9 @@ func dataReader(hasher *hasherImpl){
 			hasher.readDataChannel <- messages.NewErrorMessage(err)
 			return //Premature termination
 		}
-		if n1>0 {
+		if n1 > 0 {
 			//allocating a struct and array is inefficient but may be the right thing to parallelize the Hashing part later
-			hasher.readDataChannel <- messages.NewDataBlockMessage(hasher.currentLoc,dataBlock[:n1])
+			hasher.readDataChannel <- messages.NewDataBlockMessage(hasher.currentLoc, dataBlock[:n1])
 			hasher.currentLoc += int64(n1)
 			if utils.IsEOF(err) {
 				hasher.readDataChannel <- messages.NewEndMessage()
@@ -92,7 +92,6 @@ func dataReader(hasher *hasherImpl){
 		}
 	}
 }
-
 
 func hasherRoutine(hasher *hasherImpl) {
 	defer hasher.lockHash.Unlock()
@@ -102,7 +101,7 @@ func hasherRoutine(hasher *hasherImpl) {
 	currentMessage := messages.NewHashGroupMessage(hasher.currentLoc)
 	for err == nil && hasher.runningHash {
 		// Create new HashGroupMessage
-		msg = <- hasher.readDataChannel
+		msg = <-hasher.readDataChannel
 
 		switch msg.GetMessageID() {
 		case messages.DataBlockMessageID:
@@ -112,7 +111,7 @@ func hasherRoutine(hasher *hasherImpl) {
 				currentMessage = messages.NewHashGroupMessage(msgDataBlock.StartLoc)
 			}
 
-			hash := dummyHash(msgDataBlock.Data, configuration.HashSize)
+			hash := hasher.hashingFunc(msgDataBlock.Data, configuration.HashSize)
 			currentMessage.AddHash(hash)
 		case messages.EndMessageID:
 			if !currentMessage.IsEmpty() {
@@ -129,7 +128,6 @@ func hasherRoutine(hasher *hasherImpl) {
 			return
 		}
 	}
-	fmt.Print("cavolo")
 }
 
 func (h *hasherImpl) Stop() {
@@ -140,7 +138,7 @@ func (h *hasherImpl) Stop() {
 	h.lockRead.Lock()
 	h.lockHash.Lock()
 
-	defer func(){
+	defer func() {
 		h.lockRead.Unlock()
 		h.lockHash.Unlock()
 	}()
@@ -155,15 +153,16 @@ func (h *hasherImpl) isRunning() bool {
 	return h.runningHash || h.runningRead
 }
 
-func NewHasherImpl(blockSize int64, fileDesc *os.File, startLoc int64) Hasher {
-	instance := hasherImpl{blockSize: blockSize, fileDesc: fileDesc, currentLoc: startLoc, runningHash:false,runningRead:false}
+func NewHasherImpl(blockSize int64, fileDesc *os.File, startLoc int64, hashingFunc func([]byte, int) []byte) Hasher {
+	instance := hasherImpl{blockSize: blockSize, fileDesc: fileDesc, currentLoc: startLoc, runningHash: false, runningRead: false}
 	instance.outMsgChannel = make(chan messages.Message, configuration.HashGroupChannelSize)
 	instance.readDataChannel = make(chan messages.Message, 5)
+	instance.hashingFunc = hashingFunc
 	return &instance
 }
 
-// very dumb 'size' bit hash, for tests only
-func dummyHash(data []byte, size int) (hash []byte) {
+// very dumb 'size' bit hash, ...for tests only
+func DummyHash(data []byte, size int) (hash []byte) {
 	hash = make([]byte, size)
 	for i, elem := range data {
 		hash[i%size] = hash[i%size] ^ elem

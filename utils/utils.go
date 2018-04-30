@@ -44,6 +44,6 @@ func Max(arr []int) (el *int) {
 	return &maxim
 }
 
-func IsEOF(err error) bool{
+func IsEOF(err error) bool {
 	return err == io.ErrUnexpectedEOF || err == io.EOF
 }

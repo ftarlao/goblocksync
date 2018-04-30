@@ -19,7 +19,7 @@ func NewHashGroupMessage(startLoc int64) *HashGroupMessage {
 
 func (m *HashGroupMessage) TruncHashGroupTo(size int16) {
 	if size > m.NumHash {
-		errString := "HashGroupMessage trunc size " + string(size) + " exceed NumHash " + string(m.NumHash)
+		errString := "HashGroupMessage trunc size " + string(size) + " exceeds NumHash " + string(m.NumHash)
 		panic(errors.New(errString))
 	}
 	m.NumHash = size
