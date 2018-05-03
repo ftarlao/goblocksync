@@ -16,7 +16,7 @@ type Hasher interface {
 	Start() error
 	Stop()
 	GetCurrentPosition() int64
-	isRunning() bool
+	IsRunning() bool
 }
 
 type hasherImpl struct {
@@ -86,9 +86,9 @@ func dataReader(hasher *hasherImpl) {
 			//allocating a struct and array is inefficient but may be the right thing to parallelize the Hashing part later
 			hasher.readDataChannel <- messages.NewDataBlockMessage(hasher.currentLoc, dataBlock[:n1])
 			hasher.currentLoc += int64(n1)
-			if utils.IsEOF(err) {
-				hasher.readDataChannel <- messages.NewEndMessage()
-			}
+		}
+		if utils.IsEOF(err) {
+			hasher.readDataChannel <- messages.NewEndMessage()
 		}
 	}
 }
@@ -108,6 +108,7 @@ func hasherRoutine(hasher *hasherImpl) {
 			msgDataBlock := msg.(*messages.DataBlockMessage)
 			if currentMessage.IsFull() {
 				hasher.outMsgChannel <- currentMessage
+				// Create new HashGroupMessage
 				currentMessage = messages.NewHashGroupMessage(msgDataBlock.StartLoc)
 			}
 
@@ -149,7 +150,7 @@ func (h *hasherImpl) GetCurrentPosition() int64 {
 	return h.currentLoc
 }
 
-func (h *hasherImpl) isRunning() bool {
+func (h *hasherImpl) IsRunning() bool {
 	return h.runningHash || h.runningRead
 }
 

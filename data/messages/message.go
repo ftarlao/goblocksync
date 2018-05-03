@@ -11,7 +11,8 @@ type Message interface {
 }
 
 func EncodeMessage(encoder *gob.Encoder, m Message) error {
-	encoder.Encode(m.GetMessageID())
+	id := m.GetMessageID()
+	encoder.Encode(id)
 	err := encoder.Encode(m)
 	return err
 }
@@ -20,7 +21,7 @@ func DecodeMessage(decoder *gob.Decoder) (m Message, err error) {
 	var msgID byte
 	err = decoder.Decode(&msgID)
 	if err != nil {
-		return
+		return nil, err
 	}
 	switch msgID {
 	case HashGroupMessageID:
@@ -28,7 +29,7 @@ func DecodeMessage(decoder *gob.Decoder) (m Message, err error) {
 		err = decoder.Decode(&msg)
 		m = &msg
 	case DataBlockMessageID:
-		var msg HashGroupMessage
+		var msg DataBlockMessage
 		err = decoder.Decode(&msg)
 		m = &msg
 	case configuration.ConfigurationMessageID:
@@ -36,11 +37,11 @@ func DecodeMessage(decoder *gob.Decoder) (m Message, err error) {
 		err = decoder.Decode(&msg)
 		m = &msg
 	case ErrorMessageID:
-		var msg HashGroupMessage
+		var msg ErrorMessage
 		err = decoder.Decode(&msg)
 		m = &msg
 	case EndMessageID:
-		var msg HashGroupMessage
+		var msg EndMessage
 		err = decoder.Decode(&msg)
 		m = &msg
 	case HelloInfoMessageID:

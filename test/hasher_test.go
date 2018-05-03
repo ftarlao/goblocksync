@@ -19,14 +19,16 @@ func TestHasherImpl(t *testing.T) {
 	fileSizeBytes := int64(8511)
 	blockSizeBytes := int64(32)
 	periodSizeBytes := int64(96)
-	paramTestHasherImpl(t,fileSizeBytes,blockSizeBytes,periodSizeBytes)
-	fileSizeBytes = int64(21200)
+	paramTestHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
+	t.Log("\n")
+	//Corener case.. exactly N blocks
+	fileSizeBytes = int64(32 * 1024)
 	blockSizeBytes = int64(128)
 	periodSizeBytes = int64(1024)
-	paramTestHasherImpl(t,fileSizeBytes,blockSizeBytes,periodSizeBytes)
+	paramTestHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
 }
 
-func paramTestHasherImpl(t *testing.T, fileSizeBytes,blockSizeBytes,periodSizeBytes int64) {
+func paramTestHasherImpl(t *testing.T, fileSizeBytes, blockSizeBytes, periodSizeBytes int64) {
 	t.Log("***Hasher Test***")
 	t.Log("File size [bytes]: ", fileSizeBytes, ", block size [bytes]: ", blockSizeBytes)
 
@@ -36,7 +38,7 @@ func paramTestHasherImpl(t *testing.T, fileSizeBytes,blockSizeBytes,periodSizeBy
 	//Create temp file
 	f, err := createTmpFile(fileSizeBytes, periodSizeBytes, 0)
 	if err != nil {
-		t.Errorf("Cannot open tmp file for testing")
+		t.Error("Cannot open tmp file for testing")
 	}
 	defer f.Close()
 
@@ -62,6 +64,8 @@ MainLoop:
 			case messages.ErrorMessageID:
 				t.Error("error returned from hasher: ", msg.(*messages.ErrorMessage).Err)
 				break MainLoop
+			case messages.EndMessageID:
+				t.Log("EndMessage received from Hasher")
 			}
 		case <-time.After(TestTimeout):
 			t.Error("Timeout for Hasher, no EndMessage or no messages in queue")

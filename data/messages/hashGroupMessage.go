@@ -1,7 +1,6 @@
 package messages
 
 import (
-	"errors"
 	"github.com/ftarlao/goblocksync/data/configuration"
 )
 
@@ -15,15 +14,6 @@ type HashGroupMessage struct {
 
 func NewHashGroupMessage(startLoc int64) *HashGroupMessage {
 	return &HashGroupMessage{startLoc, 0, make([][]byte, configuration.HashGroupMessageSize)}
-}
-
-func (m *HashGroupMessage) TruncHashGroupTo(size int16) {
-	if size > m.NumHash {
-		errString := "HashGroupMessage trunc size " + string(size) + " exceeds NumHash " + string(m.NumHash)
-		panic(errors.New(errString))
-	}
-	m.NumHash = size
-	m.HashGroup = m.HashGroup[:size]
 }
 
 func (m *HashGroupMessage) TruncHashGroup() {

@@ -6,6 +6,7 @@ import (
 )
 
 //TODO Should few details about Master file names be masked .. and useless fields emptied? Less infos to the slave peer
+//TODO ?? build constructor?? More uniform with other messages?
 const ConfigurationMessageID byte = 3
 
 type Configuration struct {
