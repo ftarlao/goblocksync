@@ -15,16 +15,18 @@ import (
 
 const TestTimeout = 5 * time.Second
 
-func TestHasherImpl(t *testing.T) {
+func TestIntegrationHasherImpl(t *testing.T) {
 	fileSizeBytes := int64(8511)
 	blockSizeBytes := int64(32)
 	periodSizeBytes := int64(96)
+
 	paramTestHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
-	t.Log("\n")
-	//Corener case.. exactly N blocks
+
+	//Corner case.. data = int(N) blocks
 	fileSizeBytes = int64(32 * 1024)
 	blockSizeBytes = int64(128)
 	periodSizeBytes = int64(1024)
+
 	paramTestHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
 }
 
@@ -32,7 +34,7 @@ func paramTestHasherImpl(t *testing.T, fileSizeBytes, blockSizeBytes, periodSize
 	t.Log("***Hasher Test***")
 	t.Log("File size [bytes]: ", fileSizeBytes, ", block size [bytes]: ", blockSizeBytes)
 
-	//Extimated number of hashes
+	//Estimated number of hashes
 	var expectedNumberHash int = int(math.Ceil(float64(fileSizeBytes) / float64(blockSizeBytes)))
 
 	//Create temp file
@@ -85,7 +87,9 @@ MainLoop:
 	periodSteps := int(periodSizeBytes / blockSizeBytes)
 	t.Log("Expected the Hashes to repeat every ", periodSteps, " blocks (the periodicity)")
 	//note last hash is ignored (the block can be incomplete)
-	for i := 0; i < len(hashStorage)-periodSteps-1; i++ {
+	windowViewSize := len(hashStorage)-periodSteps-1
+	t.Log("First ",windowViewSize," hash values:")
+	for i := 0; i < windowViewSize; i++ {
 		if i < periodSteps+1 && i < len(hashStorage) {
 			t.Log("Hash ", i, ", value: ", hashStorage[i])
 		}

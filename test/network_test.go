@@ -13,7 +13,7 @@ import (
 	"errors"
 )
 
-func TestNetworkManagerRoundtrip(t *testing.T) {
+func TestUnitNetworkManagerRoundtrip(t *testing.T) {
 	t.Log("***NetworkManager***\nCheck Roundtrip for different message types")
 
 	//random generator
