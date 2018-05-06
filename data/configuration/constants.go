@@ -5,13 +5,13 @@ const Version = 0
 const MinorVersion = 1
 
 // Number of hashes inside one HashGroupMessage
-const HashGroupMessageSize = 50
+const HashGroupMessageSize = 200
 
 //Bytes for buffered hashes (64M)
 const HashMaxBytes = 64 * 1024 * 1024
 
 // Hash size [bytes], this is currently used by the dumb hash function
-const HashSize = 4
+const HashSize = 32
 
 // Size of the HashGroupMessage channel buffer (max number elements in the channel)
 const HashGroupChannelSize = HashMaxBytes / (HashGroupMessageSize * HashSize)

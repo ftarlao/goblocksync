@@ -27,7 +27,7 @@ func TestUnitNetworkManagerRoundtrip(t *testing.T) {
 	netManager.Start()
 
 	helloOut := messages.NewHelloInfo()
-	res := checkMsgRoundtrip(helloOut, netManager, rgen, t)
+	res := CheckMsgRoundtrip(helloOut, netManager, rgen, t)
 	if !res {
 		return
 	}
@@ -39,34 +39,34 @@ func TestUnitNetworkManagerRoundtrip(t *testing.T) {
 		DestinationFile: configuration.FileDetails{FileName: "pippo"},
 		SourceFile:      configuration.FileDetails{FileName: "topolino"},
 		BlockSize:       1024}
-	res = checkMsgRoundtrip(confOut, netManager, rgen, t)
+	res = CheckMsgRoundtrip(confOut, netManager, rgen, t)
 	if !res {
 		return
 	}
 
 	for i := 0; i < 5; i++ {
 		hashGroupMsg := randomHashGroupMessage(rgen)
-		res = checkMsgRoundtrip(hashGroupMsg, netManager, rgen, t)
+		res = CheckMsgRoundtrip(hashGroupMsg, netManager, rgen, t)
 		if !res {
 			return
 		}
 	}
 
 	endMessage := messages.NewEndMessage()
-	res = checkMsgRoundtrip(endMessage, netManager, rgen, t)
+	res = CheckMsgRoundtrip(endMessage, netManager, rgen, t)
 	if !res {
 		return
 	}
 
 	errorMessage := messages.NewErrorMessage(errors.New("boom"))
-	res = checkMsgRoundtrip(errorMessage, netManager, rgen, t)
+	res = CheckMsgRoundtrip(errorMessage, netManager, rgen, t)
 	if !res {
 		return
 	}
 
 	for i := 0; i < 6; i++ {
-		dataBlockMsg := randomDataBloclMessage(rgen)
-		checkMsgRoundtrip(dataBlockMsg, netManager, rgen, t)
+		dataBlockMsg := RandomDataBlockMessage(rgen, confOut.BlockSize)
+		CheckMsgRoundtrip(dataBlockMsg, netManager, rgen, t)
 		if !res {
 			return
 		}
@@ -104,14 +104,14 @@ func randomHashGroupMessage(rgen *rand.Rand) *messages.HashGroupMessage {
 	return hashGroupMsg
 }
 
-func randomDataBloclMessage(rgen *rand.Rand) *messages.DataBlockMessage {
-	data := make([]byte, 1200)
+func RandomDataBlockMessage(rgen *rand.Rand, blockSize int64) *messages.DataBlockMessage {
+	data := make([]byte, blockSize)
 	rgen.Read(data)
 	dataBlockMsg := messages.NewDataBlockMessage(12, data)
 	return dataBlockMsg
 }
 
-func checkMsgRoundtrip(msgOut messages.Message, netManager routines.NetworkManager, rgen *rand.Rand, t *testing.T) bool {
+func CheckMsgRoundtrip(msgOut messages.Message, netManager routines.NetworkManager, rgen *rand.Rand, t *testing.T) bool {
 	outMsgChan := netManager.GetOutMsgChannel()
 	inMsgChan := netManager.GetInMsgChannel()
 
@@ -129,4 +129,72 @@ func checkMsgEquality(msgOut messages.Message, msgIn messages.Message, t *testin
 		t.Error("Message of type: ", rtype, ", FAIL")
 		return false
 	}
+}
+
+
+func TestUnitNetworkManagerThroughput(t *testing.T) {
+	const testDataBytes = 1024 * 1024 *1024
+
+	t.Log("***NetworkManager***\nCalculate throughput on message roundtrip")
+
+
+	pipeIn, pipeOut := io.Pipe()
+	netManager := routines.NewNetworkManager(pipeIn, pipeOut)
+	inMsgChan := netManager.GetInMsgChannel()
+	outMsgChan := netManager.GetOutMsgChannel()
+
+
+	netManager.Start()
+
+	go func() {
+		for in := range inMsgChan {
+			_ = in
+		}
+	}()
+
+	t.Log("***HashGroupMessage throughput on message roundtrip")
+	hashMsg, msgPayloadSizeBytes := dumbHashGroupMessage(111)
+	bechmarkMsgRoundtrip(hashMsg, msgPayloadSizeBytes,testDataBytes, outMsgChan, t)
+
+	t.Log("***DataBlockMessage throughput on message roundtrip")
+	dataMsg, msgPayloadSizeBytes := dumbDataBlockMessage(128*1024)
+	bechmarkMsgRoundtrip(dataMsg, msgPayloadSizeBytes,testDataBytes, outMsgChan, t)
+
+	close(outMsgChan)
+}
+
+func bechmarkMsgRoundtrip(msg messages.Message, msgSize int64, testDataBytes int64, outMsgChan chan messages.Message, t *testing.T){
+	start := time.Now()
+	var i int64 = 0
+	for ; i < testDataBytes; i+=msgSize {
+		outMsgChan <- msg
+	}
+
+	duration := time.Since(start)
+	dataPayloadMB := float64(i)/float64(1024*1024)
+	mbSec := dataPayloadMB/duration.Seconds()
+	t.Logf("Size of data payload: %.3f MB, Duration [sec]: %.3f  Serialization speed: %.3f MB/s",dataPayloadMB, duration.Seconds(),mbSec)
+}
+
+func dumbHashGroupMessage(seed int64) (*messages.HashGroupMessage, int64) {
+	hashGroupMsg := messages.NewHashGroupMessage(seed)
+
+	for i := 0; i < configuration.HashGroupMessageSize; i++ {
+		hash := make([]byte, configuration.HashSize)
+		for j := range hash {
+			hash[j] = byte(i % 256)
+		}
+		hashGroupMsg.AddHash(hash)
+	}
+
+	return hashGroupMsg, configuration.HashGroupMessageSize*configuration.HashSize+8+2
+}
+
+func dumbDataBlockMessage(blockSizeBytes int64) (*messages.DataBlockMessage, int64) {
+	data := make([]byte, blockSizeBytes)
+	for j := range data {
+		data[j] = byte(j % 256)
+	}
+	dataBlockMsg := messages.NewDataBlockMessage(12, data)
+	return dataBlockMsg, blockSizeBytes + 8
 }
