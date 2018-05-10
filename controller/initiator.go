@@ -147,10 +147,10 @@ func handshake(in io.Reader, out io.Writer) (bestProtocol *int, err error) {
 	}
 
 	// let's choose protocol version
-	inter := utils.Intersection(configuration.SupportedProtocols, remoteHelloInfo.SupportedProtocols)
+	inter := utils.ArrIntersection(configuration.SupportedProtocols, remoteHelloInfo.SupportedProtocols)
 	if len(inter) == 0 {
 		return bestProtocol, errors.New("master and slave protocols versions are no compatible")
 	}
-	bestProtocol = utils.Max(inter)
+	bestProtocol = utils.ArrMax(inter)
 	return bestProtocol, err
 }

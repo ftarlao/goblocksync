@@ -3,7 +3,6 @@ package routines
 import (
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"github.com/ftarlao/goblocksync/data/configuration"
 	"github.com/ftarlao/goblocksync/data/messages"
 	"github.com/ftarlao/goblocksync/utils"
@@ -33,18 +32,22 @@ type NetworkManager struct {
 	stopChannel   chan bool
 }
 
-const channelWaitTime = 500 * time.Millisecond
+const channelWaitTime = time.Second
 const stopTimeout = 4 * time.Second
 
-func NewNetworkManager(in io.Reader, out io.Writer) (n NetworkManager) {
+func NewNetworkManager(blocksize int64, in io.Reader, out io.Writer) (n NetworkManager) {
+
+	maxMessageApproxSize := utils.IntMax(blocksize, configuration.HashGroupMessageSize*configuration.HashSize)
+	NetworkChannelSize := (configuration.NetworkMaxBytes / maxMessageApproxSize)/2
+
 	inDecoder, outEncoder := EncoderInOut(in, out)
 	n = NetworkManager{
 		InStream:      in,
 		OutStream:     out,
 		inDecoder:     inDecoder,
 		outEncoder:    outEncoder,
-		inMsgChannel:  make(chan messages.Message, configuration.NetworkChannelsSize),
-		outMsgChannel: make(chan messages.Message, configuration.NetworkChannelsSize),
+		inMsgChannel:  make(chan messages.Message, NetworkChannelSize),
+		outMsgChannel: make(chan messages.Message, NetworkChannelSize),
 		running:       false,
 		startDisabled: false,
 		stopChannel:   make(chan bool, 3)}
@@ -148,7 +151,6 @@ func (n *NetworkManager) Stop() (err error) {
 	for i := 0; i < 2; i++ {
 		select {
 		case <-n.stopChannel:
-			fmt.Print("stop signal")
 		case <-time.After(stopTimeout):
 			return errors.New("stop timeout")
 		}

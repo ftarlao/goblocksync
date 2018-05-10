@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"github.com/ftarlao/goblocksync/controller/routines"
 	"github.com/ftarlao/goblocksync/data/messages"
-	"io/ioutil"
 	"math"
-	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
+	"github.com/ftarlao/goblocksync/utils"
+	"math/rand"
 )
 
 const TestTimeout = 5 * time.Second
@@ -20,17 +18,17 @@ func TestIntegrationHasherImpl(t *testing.T) {
 	blockSizeBytes := int64(32)
 	periodSizeBytes := int64(96)
 
-	paramTestHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
+	testHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
 
 	//Corner case.. data = int(N) blocks
-	fileSizeBytes = int64(32 * 1024)
+	fileSizeBytes = int64(32 * utils.KB)
 	blockSizeBytes = int64(128)
-	periodSizeBytes = int64(1024)
+	periodSizeBytes = int64(utils.KB)
 
-	paramTestHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
+	testHasherImpl(t, fileSizeBytes, blockSizeBytes, periodSizeBytes)
 }
 
-func paramTestHasherImpl(t *testing.T, fileSizeBytes, blockSizeBytes, periodSizeBytes int64) {
+func testHasherImpl(t *testing.T, fileSizeBytes, blockSizeBytes, periodSizeBytes int64) {
 	t.Log("***Hasher Test***")
 	t.Log("File size [bytes]: ", fileSizeBytes, ", block size [bytes]: ", blockSizeBytes)
 
@@ -38,7 +36,7 @@ func paramTestHasherImpl(t *testing.T, fileSizeBytes, blockSizeBytes, periodSize
 	var expectedNumberHash int = int(math.Ceil(float64(fileSizeBytes) / float64(blockSizeBytes)))
 
 	//Create temp file
-	f, err := createTmpFile(fileSizeBytes, periodSizeBytes, 0)
+	f, err := utils.CreateTmpFile(fileSizeBytes, periodSizeBytes, 0)
 	if err != nil {
 		t.Error("Cannot open tmp file for testing")
 	}
@@ -100,38 +98,52 @@ MainLoop:
 	}
 	t.Log("Periodicity OK")
 
+	err = hasher.Stop()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
-// Creates a tmp file in the tmp project folder, the file is randomly generated but can have a periodicity i.e. being made
-// by a sequence that repeats.
-// periodBytes = 0 means periodicity disabled
-// seed is the random seed
-func createTmpFile(size int64, periodBytes int64, seed int64) (f *os.File, err error) {
-
-	if periodBytes == 0 {
-		//Disable periodicity
-		periodBytes = size
-	}
-
+//TODO very rough
+func TestBenchHasherImpl(t *testing.T) {
+	t.Log("Test Read speed with no-ops hash algorithm")
 	//Init the base random sequence
-	source := rand.NewSource(seed)
+	source := rand.NewSource(11111)
 	rgen := rand.New(source)
-	sequence := make([]byte, periodBytes)
-	rgen.Read(sequence)
+	var size int64 = utils.GB
 
-	tempFileName, err := filepath.Abs("../tmp")
-	if err != nil {
-		return nil, err
-	}
-	f, err = ioutil.TempFile(tempFileName, "data")
-	if err != nil {
-		return nil, err
-	}
 	data := make([]byte, size)
+	rgen.Read(data)
+	fakeFile := bytes.NewReader(data)
 
-	for i := int64(0); i < size; i += int64(len(sequence)) {
-		copy(data[i:], sequence)
+	//Init hashing facility
+	hasher := routines.NewHasherImpl(16 * utils.MB, fakeFile, 0, routines.FakeHash)
+	outMsg := hasher.GetOutMsgChannel()
+
+	start := time.Now()
+	hasher.Start()
+
+	var msg messages.Message
+MainLoop:
+	for msg == nil || msg.GetMessageID() != messages.EndMessageID {
+		select {
+		case msg = <-outMsg:
+			if msg.GetMessageID() == messages.ErrorMessageID {
+				t.Error("error returned from hasher: ", msg.(*messages.ErrorMessage).Err)
+				break MainLoop
+			}
+		}
 	}
-	_, err = f.Write(data)
-	return f, err
+	t.Log("Last message is ", msg)
+
+	//The data has been read from ramdisk, cause data is saved into DataBlockMessage structures, this doubles the ram
+	//accesses; the real max read speed may be a number between the red value and the double.
+	duration := time.Since(start)
+	dataPayloadMB := float64(size)/float64(utils.MB)
+	mbSec := dataPayloadMB/duration.Seconds()
+	t.Logf("Data has been read from a ramdisk, Hasher is able to read data with a speed in [%.2f,%.2f] MB/s",mbSec,2*mbSec)
+	err := hasher.Stop()
+	if err != nil {
+		t.Error(err)
+	}
 }
