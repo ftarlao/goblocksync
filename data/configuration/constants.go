@@ -12,6 +12,7 @@ const HashGroupMessageSize = 200
 
 //Bytes for buffered hashes (64M)
 const HashMaxBytes = 64 * utils.MB
+
 //Bytes for buffered queued data (64M)
 const DataMaxBytes = 64 * utils.MB
 
@@ -26,4 +27,4 @@ var SupportedProtocols = []int{1}
 // Max number of messages in the message queue, this should be only a small buffer (we have TCP buffers, other queues..)
 // The effective max size [bytes] depends on the message types, max block size.. it should range (approximately) between:
 // BlockSize * NetworkChannelsSize > size_bytes > HashGroupMessageSize * HashSize * NetworkChannelsSize
-const NetworkMaxBytes = 64 * utils.MB
+const NetworkMaxBytes = 32 * utils.MB

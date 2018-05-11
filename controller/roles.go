@@ -40,7 +40,7 @@ func (d destinationV1) Start() error {
 	_, outEncoder := routines.EncoderInOut(d.in, d.out)
 
 	// Start hasher
-	hasher := routines.NewHasherImpl(d.Config.BlockSize, f, d.Config.StartLoc)
+	hasher := routines.NewHasherImpl(d.Config.BlockSize, f, d.Config.StartLoc, routines.DummyHash)
 	err = hasher.Start()
 	if err != nil {
 		fmt.Println(err)
@@ -116,7 +116,7 @@ func (s sourceV1) Start() error {
 	inDecoder, _ := routines.EncoderInOut(s.in, s.out)
 
 	// Start hasher
-	hasher := routines.NewHasherImpl(s.Config.BlockSize, f, s.Config.StartLoc)
+	hasher := routines.NewHasherImpl(s.Config.BlockSize, f, s.Config.StartLoc, routines.DummyHash)
 	err = hasher.Start()
 	if err != nil {
 		fmt.Println(err)

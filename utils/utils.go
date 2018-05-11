@@ -2,10 +2,11 @@ package utils
 
 import (
 	"io"
-	"os"
-	"path/filepath"
 	"io/ioutil"
 	"math/rand"
+	"os"
+	"path/filepath"
+	"bytes"
 )
 
 // This helper will streamline the error
@@ -51,8 +52,8 @@ func ArrMax(arr []int) (el *int) {
 }
 
 //int64 utils
-func IntMax(a int64, b int64 ) int64 {
-	if a>b {
+func IntMax(a int64, b int64) int64 {
+	if a > b {
 		return a
 	} else {
 		return b
@@ -65,7 +66,6 @@ func IsEOF(err error) bool {
 	return err == io.ErrUnexpectedEOF || err == io.EOF
 }
 
-
 // Creates a tmp file in the tmp project folder, the file is randomly generated but can have a periodicity i.e. being made
 // by a sequence that repeats.
 // periodBytes = 0 means periodicity disabled
@@ -77,12 +77,6 @@ func CreateTmpFile(size int64, periodBytes int64, seed int64) (f *os.File, err e
 		periodBytes = size
 	}
 
-	//Init the base random sequence
-	source := rand.NewSource(seed)
-	rgen := rand.New(source)
-	sequence := make([]byte, periodBytes)
-	rgen.Read(sequence)
-
 	tempFileName, err := filepath.Abs("../tmp")
 	if err != nil {
 		return nil, err
@@ -91,13 +85,34 @@ func CreateTmpFile(size int64, periodBytes int64, seed int64) (f *os.File, err e
 	if err != nil {
 		return nil, err
 	}
-	data := make([]byte, size)
+	data := GeneratePeriodicData(size,periodBytes,seed)
+	_, err = f.Write(*data)
+	return f, err
+}
 
+func GeneratePeriodicData(size int64, periodBytes int64, seed int64) *[]byte {
+	source := rand.NewSource(seed)
+	rGen := rand.New(source)
+	sequence := make([]byte, periodBytes)
+	rGen.Read(sequence)
+	//repeat sequence!
+	data := make([]byte, size)
 	for i := int64(0); i < size; i += int64(len(sequence)) {
 		copy(data[i:], sequence)
 	}
-	_, err = f.Write(data)
-	return f, err
+	return &data
+}
+
+func CreateTmpRamReader(size int64, periodBytes int64, seed int64) (f *bytes.Reader) {
+
+	if periodBytes == 0 {
+		//Disable periodicity
+		periodBytes = size
+	}
+
+	data := GeneratePeriodicData(size,periodBytes,seed)
+	fakeFile := bytes.NewReader(*data)
+	return fakeFile
 }
 
 //Constants

@@ -19,10 +19,10 @@ type Hasher interface {
 	IsRunning() bool
 }
 
-const (  // iota is reset to 0
-	STOPPED = iota  // c0 == 0
-	RUNNING = iota  // c1 == 1
-	SHUTDOWN = iota  // c2 == 2
+const ( // iota is reset to 0
+	STOPPED  = iota // c0 == 0
+	RUNNING  = iota // c1 == 1
+	SHUTDOWN = iota // c2 == 2
 )
 
 type hasherImpl struct {
@@ -39,7 +39,7 @@ type hasherImpl struct {
 	// Current running status
 	running int
 	// lockHasher on Start
-	lockHasher  sync.Mutex
+	lockHasher sync.Mutex
 	// current hashing function
 	hashingFunc func([]byte, int) []byte
 	// channel for stop signals
@@ -67,11 +67,11 @@ func (h *hasherImpl) Start() error {
 
 func dataReader(n *hasherImpl) {
 	defer func() {
-		if r := recover(); r!=nil { //this is very unlikely to happen, defensive
+		if r := recover(); r != nil { //this is very unlikely to happen, defensive
 			n.readDataChannel <- messages.NewErrorMessage(r.(error))
 		}
 	}()
-	defer func(){
+	defer func() {
 		n.stopChannel <- true
 	}()
 
@@ -108,11 +108,11 @@ func dataReader(n *hasherImpl) {
 
 func hasherRoutine(n *hasherImpl) {
 	defer func() {
-		if r := recover(); r!=nil {
+		if r := recover(); r != nil {
 			n.outMsgChannel <- messages.NewErrorMessage(r.(error))
 		}
 	}()
-	defer func(){
+	defer func() {
 		n.running = SHUTDOWN
 		n.stopChannel <- true
 	}()
@@ -152,13 +152,14 @@ func hasherRoutine(n *hasherImpl) {
 	}
 }
 
-func (n *hasherImpl) Stop() error{
+func (n *hasherImpl) Stop() error {
 	n.lockHasher.Lock()
 	n.running = STOPPED
 	for i := 0; i < 2; i++ {
 		select {
-		case <- n.stopChannel:
-		case <-time.After(stopTimeout):	return errors.New("stop timeout")
+		case <-n.stopChannel:
+		case <-time.After(stopTimeout):
+			return errors.New("stop timeout")
 		}
 	}
 	n.lockHasher.Unlock()
@@ -170,18 +171,18 @@ func (n *hasherImpl) GetCurrentPosition() int64 {
 }
 
 func (n *hasherImpl) IsRunning() bool {
-	return ! (n.running == STOPPED)
+	return !(n.running == STOPPED)
 }
 
 func NewHasherImpl(blockSize int64, fileDesc io.ReadSeeker, startLoc int64, hashingFunc func([]byte, int) []byte) Hasher {
 	instance := hasherImpl{
-		blockSize: blockSize,
-		fileDesc: fileDesc,
+		blockSize:  blockSize,
+		fileDesc:   fileDesc,
 		currentLoc: startLoc,
-		running: STOPPED}
+		running:    STOPPED}
 
 	instance.outMsgChannel = make(chan messages.Message, configuration.HashGroupChannelSize)
-	instance.readDataChannel = make(chan messages.Message, configuration.DataMaxBytes / blockSize)
+	instance.readDataChannel = make(chan messages.Message, configuration.DataMaxBytes/blockSize)
 	instance.stopChannel = make(chan bool, 3)
 	instance.hashingFunc = hashingFunc
 	return &instance

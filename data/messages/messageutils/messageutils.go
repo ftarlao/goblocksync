@@ -1,8 +1,8 @@
 package messageutils
 
 import (
-	"github.com/ftarlao/goblocksync/data/messages"
 	"github.com/ftarlao/goblocksync/data/configuration"
+	"github.com/ftarlao/goblocksync/data/messages"
 	"math/rand"
 )
 
@@ -10,6 +10,7 @@ import (
 //..elsewhere there are no issues
 
 var randomDumbHashGroupCount int64 = 0
+
 func DumbHashGroupMessage(seed int64, blockSizeBytes int64) (*messages.HashGroupMessage, int64) {
 	hashGroupMsg := messages.NewHashGroupMessage(randomDumbHashGroupCount * configuration.HashGroupMessageSize * blockSizeBytes)
 
@@ -22,10 +23,11 @@ func DumbHashGroupMessage(seed int64, blockSizeBytes int64) (*messages.HashGroup
 	}
 
 	randomDumbHashGroupCount++
-	return hashGroupMsg, configuration.HashGroupMessageSize*configuration.HashSize+8+2
+	return hashGroupMsg, configuration.HashGroupMessageSize*configuration.HashSize + 8 + 2
 }
 
 var randomDumbBlockCount int64 = 0
+
 func DumbDataBlockMessage(blockSizeBytes int64) (*messages.DataBlockMessage, int64) {
 	data := make([]byte, blockSizeBytes)
 	for j := range data {
@@ -37,6 +39,7 @@ func DumbDataBlockMessage(blockSizeBytes int64) (*messages.DataBlockMessage, int
 }
 
 var randomHashGroupCount int64 = 0
+
 func RandomHashGroupMessage(rgen *rand.Rand, blockSizeBytes int64) *messages.HashGroupMessage {
 	numHash := rgen.Intn(configuration.HashGroupMessageSize)
 	hashGroupMsg := messages.NewHashGroupMessage(randomHashGroupCount * int64(numHash) * blockSizeBytes)
@@ -52,6 +55,7 @@ func RandomHashGroupMessage(rgen *rand.Rand, blockSizeBytes int64) *messages.Has
 }
 
 var randomDataBlockCount int64 = 0
+
 func RandomDataBlockMessage(rgen *rand.Rand, blockSizeBytes int64) *messages.DataBlockMessage {
 	data := make([]byte, blockSizeBytes)
 	rgen.Read(data)

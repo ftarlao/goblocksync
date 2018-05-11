@@ -1,17 +1,17 @@
 package test
 
 import (
+	"errors"
 	"github.com/ftarlao/goblocksync/controller/routines"
 	"github.com/ftarlao/goblocksync/data/configuration"
 	"github.com/ftarlao/goblocksync/data/messages"
+	"github.com/ftarlao/goblocksync/data/messages/messageutils"
+	"github.com/ftarlao/goblocksync/utils"
 	"io"
 	"math/rand"
 	"reflect"
 	"testing"
-	"github.com/ftarlao/goblocksync/data/messages/messageutils"
 	"time"
-	"errors"
-	"github.com/ftarlao/goblocksync/utils"
 )
 
 func TestUnitNetworkManagerRoundtrip(t *testing.T) {
@@ -31,45 +31,47 @@ func TestUnitNetworkManagerRoundtrip(t *testing.T) {
 	rGen := rand.New(source)
 
 	pipeIn, pipeOut := io.Pipe()
-	netManager := routines.NewNetworkManager(confOut.BlockSize, pipeIn, pipeOut)
+	netManager := routines.NewNetworkManager(confOut.EstimateNetworkChannelSize(), pipeIn, pipeOut)
 	inMsgChan := netManager.GetInMsgChannel()
 
 	netManager.Start()
 
 	helloOut := messages.NewHelloInfo()
-	res := CheckMsgRoundtrip(helloOut, netManager, rGen, t)
+	res := CheckMsgRoundtrip(helloOut, netManager, t)
 	if !res {
 		return
 	}
 
-	res = CheckMsgRoundtrip(confOut, netManager, rGen, t)
+	res = CheckMsgRoundtrip(confOut, netManager, t)
 	if !res {
 		return
 	}
 
-	for i := 0; i < 5; i++ {
+	//Send a bunch of them
+	for i := 0; i < 6; i++ {
 		hashGroupMsg := messageutils.RandomHashGroupMessage(rGen, confOut.BlockSize)
-		res = CheckMsgRoundtrip(hashGroupMsg, netManager, rGen, t)
+		res = CheckMsgRoundtrip(hashGroupMsg, netManager, t)
 		if !res {
 			return
 		}
 	}
 
 	endMessage := messages.NewEndMessage()
-	res = CheckMsgRoundtrip(endMessage, netManager, rGen, t)
+	res = CheckMsgRoundtrip(endMessage, netManager, t)
 	if !res {
 		return
 	}
 
 	errorMessage := messages.NewErrorMessage(errors.New("boom"))
-	res = CheckMsgRoundtrip(errorMessage, netManager, rGen, t)
+	res = CheckMsgRoundtrip(errorMessage, netManager, t)
 	if !res {
 		return
 	}
 
+	//Send a bunch of them
 	for i := 0; i < 6; i++ {
 		dataBlockMsg := messageutils.RandomDataBlockMessage(rGen, confOut.BlockSize)
-		CheckMsgRoundtrip(dataBlockMsg, netManager, rGen, t)
+		CheckMsgRoundtrip(dataBlockMsg, netManager, t)
 		if !res {
 			return
 		}
@@ -94,7 +96,7 @@ func TestUnitNetworkManagerRoundtrip(t *testing.T) {
 	}
 }
 
-func CheckMsgRoundtrip(msgOut messages.Message, netManager routines.NetworkManager, rgen *rand.Rand, t *testing.T) bool {
+func CheckMsgRoundtrip(msgOut messages.Message, netManager routines.NetworkManager, t *testing.T) bool {
 	outMsgChan := netManager.GetOutMsgChannel()
 	inMsgChan := netManager.GetInMsgChannel()
 
@@ -114,18 +116,25 @@ func checkMsgEquality(msgOut messages.Message, msgIn messages.Message, t *testin
 	}
 }
 
-
 func TestUnitNetworkManagerThroughput(t *testing.T) {
 	const testDataBytes = utils.GB
-	const blockSizeBytes = 128*utils.KB
+
 	t.Log("***NetworkManager***\nCalculate throughput on message roundtrip")
 
+	//dummy configuration
+	confOut := &configuration.Configuration{
+		StartLoc:        0,
+		IsSource:        true,
+		IsMaster:        true,
+		DestinationFile: configuration.FileDetails{FileName: "pippo"},
+		SourceFile:      configuration.FileDetails{FileName: "topolino"},
+		BlockSize:       128 * utils.KB}
 
+	//setup roundtrip NetworkManager, output returns as input
 	pipeIn, pipeOut := io.Pipe()
-	netManager := routines.NewNetworkManager(blockSizeBytes, pipeIn, pipeOut)
+	netManager := routines.NewNetworkManager(confOut.EstimateNetworkChannelSize(), pipeIn, pipeOut)
 	inMsgChan := netManager.GetInMsgChannel()
 	outMsgChan := netManager.GetOutMsgChannel()
-
 
 	netManager.Start()
 
@@ -136,25 +145,28 @@ func TestUnitNetworkManagerThroughput(t *testing.T) {
 	}()
 
 	t.Log("**HashGroupMessage throughput on message roundtrip**")
-	hashMsg, msgPayloadSizeBytes := messageutils.DumbHashGroupMessage(111, blockSizeBytes)
-	bechmarkMsgRoundtrip(hashMsg, msgPayloadSizeBytes,testDataBytes, outMsgChan, t)
+	hashMsg, msgPayloadSizeBytes := messageutils.DumbHashGroupMessage(111, confOut.BlockSize)
+	benchmarkMsgRoundtrip(hashMsg, msgPayloadSizeBytes, testDataBytes, outMsgChan, t)
 
 	t.Log("**DataBlockMessage throughput on message roundtrip**")
-	dataMsg, msgPayloadSizeBytes := messageutils.DumbDataBlockMessage(blockSizeBytes)
-	bechmarkMsgRoundtrip(dataMsg, msgPayloadSizeBytes,testDataBytes, outMsgChan, t)
+	dataMsg, msgPayloadSizeBytes := messageutils.DumbDataBlockMessage(confOut.BlockSize)
+	benchmarkMsgRoundtrip(dataMsg, msgPayloadSizeBytes, testDataBytes, outMsgChan, t)
 
-	close(outMsgChan)
+	err := netManager.Stop()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
-func bechmarkMsgRoundtrip(msg messages.Message, msgSize int64, testDataBytes int64, outMsgChan chan messages.Message, t *testing.T){
+func benchmarkMsgRoundtrip(msg messages.Message, msgSize int64, testDataBytes int64, outMsgChan chan messages.Message, t *testing.T) {
 	start := time.Now()
 	var i int64 = 0
-	for ; i < testDataBytes; i+=msgSize {
+	for ; i < testDataBytes; i += msgSize {
 		outMsgChan <- msg
 	}
 
 	duration := time.Since(start)
-	dataPayloadMB := float64(i)/float64(utils.MB)
-	mbSec := dataPayloadMB/duration.Seconds()
-	t.Logf("Size of data payload: %.3f MB, Duration [sec]: %.3f  Serialization speed: %.3f MB/s",dataPayloadMB, duration.Seconds(),mbSec)
+	dataPayloadMB := float64(i) / float64(utils.MB)
+	mbSec := dataPayloadMB / duration.Seconds()
+	t.Logf("Size of data payload: %.3f MB, Duration [sec]: %.3f  Serialization speed: %.3f MB/s", dataPayloadMB, duration.Seconds(), mbSec)
 }

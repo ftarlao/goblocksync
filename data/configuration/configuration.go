@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"errors"
+	"github.com/ftarlao/goblocksync/utils"
 	"os"
 )
 
@@ -22,7 +23,8 @@ type Configuration struct {
 	BlockSize int64
 }
 
-func (c Configuration) Validate() (bool, error) {
+//TODO integrate validation
+func (c *Configuration) Validate() (bool, error) {
 	var err error
 	correct := len(c.SourceFile.FileName) > 0 && len(c.DestinationFile.FileName) > 0
 	if !correct {
@@ -37,8 +39,9 @@ func (c Configuration) Validate() (bool, error) {
 	return correct, err
 }
 
-func (c Configuration) Complement() Configuration {
-	conf := c
+//Creates the configuration that should be provided to the remote peer
+func (c *Configuration) Complement() Configuration {
+	conf := *c //copy value
 	conf.IsMaster = !c.IsMaster
 	conf.IsSource = !c.IsSource
 	return conf
@@ -46,6 +49,12 @@ func (c Configuration) Complement() Configuration {
 
 func (*Configuration) GetMessageID() byte {
 	return ConfigurationMessageID
+}
+
+func (c *Configuration) EstimateNetworkChannelSize() int {
+	maxMessageApproxSize := utils.IntMax(c.BlockSize, HashGroupMessageSize*HashSize)
+	networkChannelSize := (NetworkMaxBytes / maxMessageApproxSize) / 2
+	return int(networkChannelSize)
 }
 
 type FileDetails struct {

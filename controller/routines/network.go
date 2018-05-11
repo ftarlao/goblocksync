@@ -3,7 +3,6 @@ package routines
 import (
 	"encoding/gob"
 	"errors"
-	"github.com/ftarlao/goblocksync/data/configuration"
 	"github.com/ftarlao/goblocksync/data/messages"
 	"github.com/ftarlao/goblocksync/utils"
 	"io"
@@ -35,10 +34,7 @@ type NetworkManager struct {
 const channelWaitTime = time.Second
 const stopTimeout = 4 * time.Second
 
-func NewNetworkManager(blocksize int64, in io.Reader, out io.Writer) (n NetworkManager) {
-
-	maxMessageApproxSize := utils.IntMax(blocksize, configuration.HashGroupMessageSize*configuration.HashSize)
-	NetworkChannelSize := (configuration.NetworkMaxBytes / maxMessageApproxSize)/2
+func NewNetworkManager(channelSize int, in io.Reader, out io.Writer) (n NetworkManager) {
 
 	inDecoder, outEncoder := EncoderInOut(in, out)
 	n = NetworkManager{
@@ -46,8 +42,8 @@ func NewNetworkManager(blocksize int64, in io.Reader, out io.Writer) (n NetworkM
 		OutStream:     out,
 		inDecoder:     inDecoder,
 		outEncoder:    outEncoder,
-		inMsgChannel:  make(chan messages.Message, NetworkChannelSize),
-		outMsgChannel: make(chan messages.Message, NetworkChannelSize),
+		inMsgChannel:  make(chan messages.Message, channelSize),
+		outMsgChannel: make(chan messages.Message, channelSize),
 		running:       false,
 		startDisabled: false,
 		stopChannel:   make(chan bool, 3)}
