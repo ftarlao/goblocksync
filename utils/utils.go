@@ -16,8 +16,8 @@ func Check(e error) {
 	}
 }
 
-// When array arr arrContains integer el, returns true, otherwise returns false
-func arrContains(arr []int, el int) bool {
+// When array arr SliceContains integer el, returns true, otherwise returns false
+func SliceContains(arr []int, el int) bool {
 	for _, a := range arr {
 		if a == el {
 			return true
@@ -27,10 +27,10 @@ func arrContains(arr []int, el int) bool {
 }
 
 // Create the Array containing the values in arr1 that are also in arr2, there is no unicity constrain
-func ArrIntersection(arr1 []int, arr2 []int) (intersection []int) {
+func SliceIntersection(arr1 []int, arr2 []int) (intersection []int) {
 	intersection = make([]int, 0, len(arr1))
 	for _, a := range arr1 {
-		if arrContains(arr2, a) {
+		if SliceContains(arr2, a) {
 			intersection = append(intersection, a)
 		}
 	}
@@ -38,7 +38,7 @@ func ArrIntersection(arr1 []int, arr2 []int) (intersection []int) {
 }
 
 // Find max in array, returns nil for empty arrays
-func ArrMax(arr []int) (el *int) {
+func SliceMax(arr []int) (el *int) {
 	if len(arr) == 0 {
 		return nil
 	}

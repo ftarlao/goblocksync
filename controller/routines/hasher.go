@@ -9,6 +9,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"strconv"
 )
 
 type Hasher interface {
@@ -146,7 +147,8 @@ func hasherRoutine(n *hasherImpl) {
 			n.outMsgChannel <- msg
 			return
 		default:
-			n.outMsgChannel <- messages.NewErrorMessage(errors.New("unexpected msg type provided from data reader goroutine to the hashing goroutine"))
+			unexpectedTypeStr := strconv.Itoa(int(msg.GetMessageID()))
+			n.outMsgChannel <- messages.NewErrorMessage(errors.New("unexpected msg type" + unexpectedTypeStr + " provided from data reader goroutine to the hashing goroutine"))
 			return
 		}
 	}

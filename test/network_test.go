@@ -80,7 +80,7 @@ func TestUnitNetworkManagerRoundtrip(t *testing.T) {
 	for i := true; i; {
 		select {
 		case m := <-inMsgChan:
-			t.Error("found one message more than expected, message : ", m)
+			t.Error("found one message more than expected, type of message : ", reflect.TypeOf(m))
 			return
 		case <-time.After(1 * time.Second):
 			{

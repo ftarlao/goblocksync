@@ -6,10 +6,10 @@ import (
 	"github.com/ftarlao/goblocksync/data/messages"
 	"github.com/ftarlao/goblocksync/utils"
 	"math"
-	"math/rand"
 	"testing"
 	"time"
 	"io"
+	"reflect"
 )
 
 const TestTimeout = 5 * time.Second
@@ -49,7 +49,7 @@ func testHasherImpl(userRam bool, t *testing.T, fileSizeBytes, blockSizeBytes, p
 		f = fCloser
 		defer fCloser.Close()
 	} else {
-		//Simulates a file, in RAM
+		//Simulates the file, in RAM
 		f = utils.CreateTmpRamReader(fileSizeBytes,periodSizeBytes, 0)
 	}
 	//Init hashing facility
@@ -116,14 +116,11 @@ MainLoop:
 
 func TestBenchHasherImpl(t *testing.T) {
 	t.Log("Test Read speed with no-ops hash algorithm")
-	//Init the base random sequence
-	source := rand.NewSource(11111)
-	rgen := rand.New(source)
+
 	var size int64 = utils.GB
 
-	data := make([]byte, size)
-	rgen.Read(data)
-	fakeFile := bytes.NewReader(data)
+
+	fakeFile := utils.CreateTmpRamReader(size,0,11111)
 
 	//Init hashing facility
 	hasher := routines.NewHasherImpl(16*utils.MB, fakeFile, 0, routines.FakeHash)
@@ -143,14 +140,14 @@ MainLoop:
 			}
 		}
 	}
-	t.Log("Last message is ", msg)
+	t.Log("Last message type is ", reflect.TypeOf(msg))
 
 	//The data has been read from RAMdisk, cause data is saved into DataBlockMessage structures, this doubles the RAM
 	//accesses; the effective max read speed may be a number between the estimated value and the double.
 	duration := time.Since(start)
 	dataPayloadMB := float64(size) / float64(utils.MB)
 	mbSec := dataPayloadMB / duration.Seconds()
-	t.Logf("Data has been read from a ramdisk, Hasher is able to read data with a speed in [%.2f,%.2f] MB/s", mbSec, 2*mbSec)
+	t.Logf("Data has been read from a ramdisk, Hasher is able to read data with a speed in between [%.2f,%.2f] MB/s", mbSec, 2*mbSec)
 	err := hasher.Stop()
 	if err != nil {
 		t.Error(err)
