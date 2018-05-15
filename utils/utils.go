@@ -70,7 +70,7 @@ func IsEOF(err error) bool {
 // by a sequence that repeats.
 // periodBytes = 0 means periodicity disabled
 // seed is the random seed
-func CreateTmpFile(size int64, periodBytes int64, seed int64) (f *os.File, err error) {
+func CreatePeriodicTmpFile(size int64, periodBytes int64, seed int64) (f *os.File, err error) {
 
 	if periodBytes == 0 {
 		//Disable periodicity
@@ -90,6 +90,24 @@ func CreateTmpFile(size int64, periodBytes int64, seed int64) (f *os.File, err e
 	return f, err
 }
 
+func CreatePeriodicTmpRamReader(size int64, periodBytes int64, seed int64) (f *bytes.Reader) {
+
+	if periodBytes == 0 {
+		//Disable periodicity
+		periodBytes = size
+	}
+
+	data := GeneratePeriodicData(size,periodBytes,seed)
+	fakeFile := bytes.NewReader(*data)
+	return fakeFile
+}
+
+func CreateRampedTmpRamReader(size int64, stepBytes int64) (f *bytes.Reader) {
+	data := GenerateRampData(size,stepBytes)
+	fakeFile := bytes.NewReader(*data)
+	return fakeFile
+}
+
 func GeneratePeriodicData(size int64, periodBytes int64, seed int64) *[]byte {
 	source := rand.NewSource(seed)
 	rGen := rand.New(source)
@@ -103,17 +121,14 @@ func GeneratePeriodicData(size int64, periodBytes int64, seed int64) *[]byte {
 	return &data
 }
 
-func CreateTmpRamReader(size int64, periodBytes int64, seed int64) (f *bytes.Reader) {
-
-	if periodBytes == 0 {
-		//Disable periodicity
-		periodBytes = size
+func GenerateRampData(size int64, stepBytes int64) *[]byte {
+	data := make([]byte, size)
+	for i := int64(0); i < size; i++ {
+		data[i] = byte((i / stepBytes) % 256)
 	}
-
-	data := GeneratePeriodicData(size,periodBytes,seed)
-	fakeFile := bytes.NewReader(*data)
-	return fakeFile
+	return &data
 }
+
 
 //Constants
 //Data size bytes

@@ -204,3 +204,25 @@ func FakeHash(data []byte, size int) (hash []byte) {
 	hash = make([]byte, size)
 	return hash
 }
+
+// returns hash array, the first element is the min value and the second is the max value, in the data array, the
+// other elements are zero-filled
+func MaxMinHash(data []byte, size int) (hash []byte) {
+	if len(data)==0 || size < 2{
+		panic(errors.New("wrong arguments in MaxMinHash"))
+	}
+	hash = make([]byte, size)
+	var maxD byte = 0
+	var minD byte = 255
+	for _,v := range data{
+		if maxD < v {
+			maxD = v
+		}
+		if minD > v {
+			minD = v
+		}
+	}
+	hash[0] = minD
+	hash[1] = maxD
+	return hash
+}

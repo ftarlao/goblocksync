@@ -42,7 +42,7 @@ func testHasherImpl(userRam bool, t *testing.T, fileSizeBytes, blockSizeBytes, p
 
 	if !userRam {
 		//Create temp file
-		fCloser, err := utils.CreateTmpFile(fileSizeBytes, periodSizeBytes, 0)
+		fCloser, err := utils.CreatePeriodicTmpFile(fileSizeBytes, periodSizeBytes, 0)
 		if err != nil {
 			t.Error("Cannot open tmp file for testing")
 		}
@@ -50,7 +50,7 @@ func testHasherImpl(userRam bool, t *testing.T, fileSizeBytes, blockSizeBytes, p
 		defer fCloser.Close()
 	} else {
 		//Simulates the file, in RAM
-		f = utils.CreateTmpRamReader(fileSizeBytes,periodSizeBytes, 0)
+		f = utils.CreatePeriodicTmpRamReader(fileSizeBytes,periodSizeBytes, 0)
 	}
 	//Init hashing facility
 	hasher := routines.NewHasherImpl(blockSizeBytes, f, 0, routines.DummyHash)
@@ -120,7 +120,7 @@ func TestBenchHasherImpl(t *testing.T) {
 	var size int64 = utils.GB
 
 
-	fakeFile := utils.CreateTmpRamReader(size,0,11111)
+	fakeFile := utils.CreatePeriodicTmpRamReader(size,0,11111)
 
 	//Init hashing facility
 	hasher := routines.NewHasherImpl(16*utils.MB, fakeFile, 0, routines.FakeHash)
@@ -151,5 +151,75 @@ MainLoop:
 	err := hasher.Stop()
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+//TODO check the loops, perhaps we should add timeouts
+
+
+func TestUnitHasherImpl2(t *testing.T) {
+	t.Log("Test the position of blocks considered by the Hasher and the application of the Hash function")
+
+	var size int64 = 1953
+	var blockSize int64 = 111
+
+	expectedNumberHash := size / blockSize
+	if size / blockSize != 0 {
+		expectedNumberHash++
+	}
+
+	hashStorage := make([][]byte, 0, expectedNumberHash)
+
+	fakeFile := utils.CreateRampedTmpRamReader(size,blockSize)
+
+	//Init hashing facility
+	hasher := routines.NewHasherImpl(blockSize, fakeFile, 0, routines.MaxMinHash)
+	outMsg := hasher.GetOutMsgChannel()
+
+	hasher.Start()
+
+	var msg messages.Message
+MainLoop:
+	for msg == nil || msg.GetMessageID() != messages.EndMessageID {
+		select {
+		case msg = <-outMsg:
+				if msg.GetMessageID() == messages.HashGroupMessageID {
+					hMsg := msg.(*messages.HashGroupMessage)
+					hashStorage = append(hashStorage, hMsg.HashGroup...)
+				}
+				if msg.GetMessageID() == messages.ErrorMessageID {
+				t.Error("error returned from hasher: ", msg.(*messages.ErrorMessage).Err)
+				break MainLoop
+			}
+		}
+	}
+	t.Log("Last message type is ", reflect.TypeOf(msg))
+
+
+	//Check Hash correctess
+	success := true
+	for i,v := range hashStorage {
+		if v[0]!=v[1]{
+			t.Error("Blocks are not aligned, ManMixHash sees different min and max values")
+			success = false
+			break
+		}
+		if v[0]!= byte(i % 256) {
+			success = false
+			t.Error("Hash values are different from expected hash num ",i," has min value ",v[0]," but expected is ", i % 256)
+			break
+		}
+	}
+
+	err := hasher.Stop()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if(success){
+		t.Log("Test OK")
+	} else {
+		t.Log("Generated Hash(es):\n",hashStorage)
 	}
 }
